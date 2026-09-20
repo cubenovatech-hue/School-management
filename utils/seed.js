@@ -122,7 +122,11 @@ async function run() {
 
     await Fee.create({
       student: student._id,
-      totalDue: 45000,
+      components: [
+        { type: "tuition", label: "Tuition Fee", amount: 45000 },
+        { type: "lab", label: "Lab Fee", amount: 3500 },
+        { type: "transport", label: "Transport Fee", amount: 6000 },
+      ],
       payments: [{ amount: 20000, method: "upi", note: "First installment" }],
     });
 
