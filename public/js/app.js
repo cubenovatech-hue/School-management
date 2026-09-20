@@ -108,6 +108,7 @@ function renderSidebar(activeKey) {
       ["leads", "Admissions CRM", "/pages/leads.html"],
       ["subscriptions", "Subscriptions", "/pages/admin-subscriptions.html"],
       ["timetable", "Timetable", "/pages/admin-timetable.html"],
+      ["salary", "Teacher Salary", "/pages/admin-salary.html"],
       ["library", "Library", "/pages/library.html"],
       ["announcements", "Announcements", "/pages/announcements.html"],
       ["messages", "Contact Messages", "/pages/admin-messages.html"],
@@ -117,6 +118,8 @@ function renderSidebar(activeKey) {
       ["attendance", "Take Attendance", "/pages/teacher-attendance.html"],
       ["grades", "Grades", "/pages/teacher-grades.html"],
       ["timetable", "My Timetable", "/pages/teacher-timetable.html"],
+      ["salary", "My Salary", "/pages/teacher-salary.html"],
+      ["notifications", "Notifications", "/pages/notifications.html"],
       ["announcements", "Announcements", "/pages/announcements.html"],
     ],
     student: [
@@ -125,10 +128,12 @@ function renderSidebar(activeKey) {
       ["grades", "My Grades", "/pages/student-grades.html"],
       ["timetable", "My Timetable", "/pages/student-timetable.html"],
       ["library", "Library", "/pages/library.html"],
+      ["notifications", "Notifications", "/pages/notifications.html"],
       ["announcements", "Announcements", "/pages/announcements.html"],
     ],
     parent: [
       ["overview", "Overview", "/pages/parent.html"],
+      ["notifications", "Notifications", "/pages/notifications.html"],
       ["announcements", "Announcements", "/pages/announcements.html"],
     ],
   };
@@ -150,7 +155,7 @@ function renderSidebar(activeKey) {
       ${items
         .map(
           ([key, label, href]) =>
-            `<a href="${href}" class="${key === activeKey ? "active" : ""}">${label}</a>`
+            `<a href="${href}" class="${key === activeKey ? "active" : ""}">${label}${key === "notifications" ? ' <span id="navNotifBadge" style="display:none; background:var(--crm); color:#fff; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; margin-left:6px;"></span>' : ""}</a>`
         )
         .join("")}
     </nav>
@@ -159,4 +164,59 @@ function renderSidebar(activeKey) {
       <button onclick="logout()">Log out →</button>
     </div>
   `;
+
+  ensureMobileNavChrome();
+
+  // Fetch unread notification count in the background, for any role that has a Notifications link
+  if (items.some(([key]) => key === "notifications")) {
+    api("/misc/messages/inbox")
+      .then((messages) => {
+        const unread = messages.filter((m) => !m.read).length;
+        const badge = document.getElementById("navNotifBadge");
+        if (badge && unread > 0) {
+          badge.textContent = unread > 9 ? "9+" : unread;
+          badge.style.display = "inline-block";
+        }
+      })
+      .catch(() => {}); // silent — a badge failing to load shouldn't break the page
+  }
+}
+
+/* ---------------- Mobile navigation: hamburger topbar + off-canvas drawer ---------------- */
+function ensureMobileNavChrome() {
+  if (!document.getElementById("mobileTopbar")) {
+    const topbar = document.createElement("div");
+    topbar.id = "mobileTopbar";
+    topbar.className = "mobile-topbar";
+    topbar.innerHTML = `
+      <button class="hamburger-btn" onclick="toggleMobileSidebar()" aria-label="Open menu"><span></span><span></span><span></span></button>
+      <div class="brand"><span class="dot"></span> Northfield School</div>
+      <span style="width:32px;"></span>
+    `;
+    const appShell = document.querySelector(".app-shell");
+    if (appShell) appShell.insertBefore(topbar, appShell.firstChild);
+  }
+
+  if (!document.getElementById("sidebarOverlay")) {
+    const overlay = document.createElement("div");
+    overlay.id = "sidebarOverlay";
+    overlay.className = "sidebar-overlay";
+    overlay.addEventListener("click", closeMobileSidebar);
+    document.body.appendChild(overlay);
+  }
+}
+
+function toggleMobileSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+  if (!sidebar) return;
+  const isOpen = sidebar.classList.toggle("open");
+  if (overlay) overlay.classList.toggle("show", isOpen);
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById("sidebar");
+  const overlay = document.getElementById("sidebarOverlay");
+  if (sidebar) sidebar.classList.remove("open");
+  if (overlay) overlay.classList.remove("show");
 }
