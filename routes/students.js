@@ -38,10 +38,21 @@ router.get("/:id", async (req, res) => {
 
 router.post("/", allow("admin"), async (req, res) => {
   try {
-    const { loginEmail, guardianLoginEmail, ...studentFields } = req.body;
+    const { loginEmail, guardianLoginEmail, labFee, transportFee, ...studentFields } = req.body;
 
     const student = await Student.create(studentFields);
-    await Fee.create({ student: student._id, totalDue: student.feeStructureAmount || 0, payments: [] });
+
+    const components = [];
+    if (student.feeStructureAmount) {
+      components.push({ type: "tuition", label: "Tuition Fee", amount: Number(student.feeStructureAmount) });
+    }
+    if (labFee) {
+      components.push({ type: "lab", label: "Lab Fee", amount: Number(labFee) });
+    }
+    if (transportFee) {
+      components.push({ type: "transport", label: "Transport Fee", amount: Number(transportFee) });
+    }
+    await Fee.create({ student: student._id, components, payments: [] });
 
     const credentials = {};
 
