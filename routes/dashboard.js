@@ -67,7 +67,7 @@ router.get("/student", allow("student"), async (req, res) => {
     const fee = await Fee.findOne({ student: studentId });
     res.json({
       attendancePercentage: percentage,
-      feeBalance: fee ? fee.totalDue - fee.payments.reduce((s, p) => s + p.amount, 0) : 0,
+      feeBalance: fee ? fee.balance : 0,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -86,7 +86,7 @@ router.get("/parent", allow("parent"), async (req, res) => {
       results.push({
         child,
         attendancePercentage: percentage,
-        feeBalance: fee ? fee.totalDue - fee.payments.reduce((s, p) => s + p.amount, 0) : 0,
+        feeBalance: fee ? fee.balance : 0,
       });
     }
     res.json(results);
