@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Grades — Teacher</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Teacher portal</div>
+        <h1>Grades</h1>
+      </div>
+      <button class="btn" onclick="openModal()">+ New exam</button>
+    </div>
+
+    <div class="panel">
+      <div class="field" style="max-width:320px;"><label>Select exam</label><select id="examSelect"></select></div>
+      <table>
+        <thead><tr><th>Student</th><th>Marks obtained</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <button class="btn" style="margin-top:14px;" onclick="saveGrades()">Save grades</button>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2 style="margin-bottom:18px;">New exam</h2>
+    <form id="examForm">
+      <div class="field"><label>Title</label><input id="f_title" required placeholder="Mid-Term 2026" /></div>
+      <div class="field"><label>Class</label><select id="f_class" required></select></div>
+      <div class="field"><label>Subject</label><input id="f_subject" required /></div>
+      <div class="field"><label>Date</label><input id="f_date" type="date" required /></div>
+      <div class="field"><label>Max marks</label><input id="f_max" type="number" value="100" /></div>
+      <button class="btn" type="submit" style="width:100%; justify-content:center;">Create exam</button>
+    </form>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["teacher"]);
+  renderSidebar("grades");
+
+  let assignedClasses = [];
+  let exams = [];
+
+  async function init() {
+    const d = await api("/dashboard/teacher");
+    assignedClasses = d.teacher ? d.teacher.assignedClasses : [];
+    document.getElementById("f_class").innerHTML = assignedClasses
+      .map((c) => `<option value="${c._id}">${c.name}-${c.section}</option>`)
+      .join("");
+    await loadExams();
+  }
+
+  async function loadExams() {
+    exams = [];
+    for (const c of assignedClasses) {
+      const list = await api(`/exams?classId=${c._id}`);
+      exams.push(...list);
+    }
+    document.getElementById("examSelect").innerHTML = exams
+      .map((ex) => `<option value="${ex._id}">${ex.title} — ${ex.subject} (${ex.schoolClass.name}-${ex.schoolClass.section})</option>`)
+      .join("");
+    if (exams.length) loadRoster(exams[0]);
+  }
+
+  document.getElementById("examSelect").addEventListener("change", (e) => {
+    const ex = exams.find((x) => x._id === e.target.value);
+    if (ex) loadRoster(ex);
+  });
+
+  async function loadRoster(exam) {
+    const students = await api(`/students?classId=${exam.schoolClass._id}`);
+    const grades = await api(`/exams/grades/exam/${exam._id}`);
+    const gradeMap = Object.fromEntries(grades.map((g) => [g.student._id, g.marksObtained]));
+    document.getElementById("rows").innerHTML = students
+      .map(
+        (s) => `<tr data-student="${s._id}">
+          <td>${s.name}</td>
+          <td><input type="number" class="marksInput" style="width:100px;" max="${exam.maxMarks}" value="${gradeMap[s._id] ?? ""}" /></td>
+        </tr>`
+      )
+      .join("");
+  }
+
+  async function saveGrades() {
+    const examId = document.getElementById("examSelect").value;
+    const entries = [...document.querySelectorAll("#rows tr[data-student]")]
+      .map((tr) => ({
+        student: tr.dataset.student,
+        rawValue: tr.querySelector(".marksInput").value,
+        marksObtained: Number(tr.querySelector(".marksInput").value),
+      }))
+      .filter((e) => e.rawValue !== "" && !Number.isNaN(e.marksObtained))
+      .map(({ student, marksObtained }) => ({ student, marksObtained }));
+
+    try {
+      const res = await api("/exams/grades", { method: "POST", body: JSON.stringify({ examId, entries }) });
+      toast(res.message);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  function openModal() { document.getElementById("modalBackdrop").classList.add("show"); }
+  function closeModal() { document.getElementById("modalBackdrop").classList.remove("show"); }
+
+  document.getElementById("examForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await api("/exams", {
+        method: "POST",
+        body: JSON.stringify({
+          title: document.getElementById("f_title").value,
+          schoolClass: document.getElementById("f_class").value,
+          subject: document.getElementById("f_subject").value,
+          date: document.getElementById("f_date").value,
+          maxMarks: Number(document.getElementById("f_max").value) || 100,
+        }),
+      });
+      toast("Exam created");
+      closeModal();
+      e.target.reset();
+      loadExams();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  init().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>

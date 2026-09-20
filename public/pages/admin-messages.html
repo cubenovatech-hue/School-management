@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Messages — Admin</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Admin portal</div>
+        <h1>Contact messages</h1>
+      </div>
+    </div>
+
+    <div id="list"></div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["admin"]);
+  renderSidebar("messages");
+
+  async function loadMessages() {
+    const messages = await api("/contact");
+    document.getElementById("list").innerHTML =
+      messages
+        .map(
+          (m) => `<div class="panel" style="${m.read ? "" : "border-left:4px solid var(--crm);"}">
+            <div class="flex-between">
+              <h3>${m.name} ${m.read ? "" : '<span class="pill new" style="margin-left:8px;">New</span>'}</h3>
+              <span class="small-text muted">${fmtDate(m.createdAt)}</span>
+            </div>
+            <div class="small-text muted" style="margin:4px 0 12px;">${m.email}</div>
+            <p style="font-size:14px; line-height:1.6; margin-bottom:14px;">${m.message}</p>
+            <div style="display:flex; gap:8px;">
+              ${!m.read ? `<button class="btn small secondary" onclick="markRead('${m._id}')">Mark as read</button>` : ""}
+              <a class="btn small ghost" href="mailto:${m.email}">Reply by email</a>
+              <button class="btn small ghost" onclick="removeMessage('${m._id}')">Delete</button>
+            </div>
+          </div>`
+        )
+        .join("") || `<div class="empty-state">No messages yet. Submissions from the homepage contact form will show up here.</div>`;
+  }
+
+  async function markRead(id) {
+    try {
+      await api(`/contact/${id}/read`, { method: "PUT" });
+      loadMessages();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  async function removeMessage(id) {
+    if (!confirm("Delete this message?")) return;
+    try {
+      await api(`/contact/${id}`, { method: "DELETE" });
+      toast("Deleted");
+      loadMessages();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  loadMessages().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>

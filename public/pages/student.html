@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Overview — Student</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Student portal</div>
+        <h1>Hi, <span id="sName"></span> 👋</h1>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Quick links</h2></div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <a class="btn secondary" href="/pages/student-attendance.html">View attendance</a>
+        <a class="btn secondary" href="/pages/student-grades.html">View grades</a>
+        <a class="btn secondary" href="/pages/library.html">Library</a>
+        <a class="btn secondary" href="/pages/announcements.html">Announcements</a>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  const user = requireAuth(["student"]);
+  renderSidebar("overview");
+  document.getElementById("sName").textContent = user.name.split(" ")[0];
+
+  (async function load() {
+    try {
+      const d = await api("/dashboard/student");
+      document.getElementById("statGrid").innerHTML = `
+        <div class="stat-tile"><div class="value">${d.attendancePercentage}%</div><div class="label">Attendance</div></div>
+        <div class="stat-tile"><div class="value" style="color:${d.feeBalance > 0 ? "var(--danger)" : "var(--ok)"}">${fmtCurrency(d.feeBalance)}</div><div class="label">Fee balance</div></div>
+      `;
+    } catch (err) {
+      toast(err.message, true);
+    }
+  })();
+</script>
+</body>
+</html>

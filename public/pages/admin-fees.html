@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fees — Admin</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Admin portal</div>
+        <h1>Fee ledger</h1>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>All students</h2></div>
+      <table>
+        <thead><tr><th>Student</th><th>Total due</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2 id="modalTitle" style="margin-bottom:18px;">Record payment</h2>
+    <form id="payForm">
+      <input type="hidden" id="f_student" />
+      <div class="field"><label>Amount (₹)</label><input id="f_amount" type="number" required /></div>
+      <div class="field">
+        <label>Method</label>
+        <select id="f_method">
+          <option value="cash">Cash</option>
+          <option value="upi">UPI</option>
+          <option value="card">Card</option>
+          <option value="bank_transfer">Bank transfer</option>
+          <option value="cheque">Cheque</option>
+        </select>
+      </div>
+      <div class="field"><label>Note</label><input id="f_note" placeholder="Optional" /></div>
+      <button class="btn" type="submit" style="width:100%; justify-content:center;">Record payment</button>
+    </form>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["admin"]);
+  renderSidebar("fees");
+
+  async function loadFees() {
+    const fees = await api("/fees");
+    document.getElementById("rows").innerHTML = fees
+      .map((f) => {
+        const paid = f.payments.reduce((s, p) => s + p.amount, 0);
+        const balance = f.totalDue - paid;
+        return `<tr>
+          <td>${f.student ? f.student.name : "-"}</td>
+          <td>${fmtCurrency(f.totalDue)}</td>
+          <td>${fmtCurrency(paid)}</td>
+          <td style="color:${balance > 0 ? "var(--danger)" : "var(--ok)"}; font-weight:600;">${fmtCurrency(balance)}</td>
+          <td><button class="btn small secondary" onclick="openModal('${f.student._id}', '${f.student.name}')">Record payment</button></td>
+        </tr>`;
+      })
+      .join("");
+
+    const summary = await api("/fees/summary/overview");
+    document.getElementById("statGrid").innerHTML = `
+      <div class="stat-tile"><div class="value">${fmtCurrency(summary.totalPaid)}</div><div class="label">Total collected</div></div>
+      <div class="stat-tile"><div class="value" style="color:var(--danger)">${fmtCurrency(summary.totalOutstanding)}</div><div class="label">Outstanding</div></div>
+      <div class="stat-tile"><div class="value">${summary.defaulters.length}</div><div class="label">Students with dues</div></div>
+    `;
+  }
+
+  function openModal(studentId, name) {
+    document.getElementById("f_student").value = studentId;
+    document.getElementById("modalTitle").textContent = `Record payment — ${name}`;
+    document.getElementById("modalBackdrop").classList.add("show");
+  }
+  function closeModal() { document.getElementById("modalBackdrop").classList.remove("show"); }
+
+  document.getElementById("payForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const studentId = document.getElementById("f_student").value;
+      await api(`/fees/student/${studentId}/payment`, {
+        method: "POST",
+        body: JSON.stringify({
+          amount: Number(document.getElementById("f_amount").value),
+          method: document.getElementById("f_method").value,
+          note: document.getElementById("f_note").value,
+        }),
+      });
+      toast("Payment recorded");
+      closeModal();
+      e.target.reset();
+      loadFees();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  loadFees().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>

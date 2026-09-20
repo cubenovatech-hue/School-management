@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Overview — Teacher</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Teacher portal</div>
+        <h1>Welcome, <span id="tName"></span></h1>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>My classes</h2></div>
+      <table>
+        <thead><tr><th>Class</th><th>Room</th><th>Subjects</th></tr></thead>
+        <tbody id="classRows"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  const user = requireAuth(["teacher"]);
+  renderSidebar("overview");
+  document.getElementById("tName").textContent = user.name.split(" ")[0];
+
+  (async function load() {
+    try {
+      const d = await api("/dashboard/teacher");
+      document.getElementById("statGrid").innerHTML = `
+        <div class="stat-tile"><div class="value">${d.classCount}</div><div class="label">Classes assigned</div></div>
+        <div class="stat-tile"><div class="value">${d.studentCount}</div><div class="label">Total students</div></div>
+      `;
+      const classes = d.teacher ? d.teacher.assignedClasses : [];
+      document.getElementById("classRows").innerHTML =
+        classes
+          .map((c) => `<tr><td>${c.name}-${c.section}</td><td>${c.room || "-"}</td><td>${(c.subjects || []).join(", ")}</td></tr>`)
+          .join("") || `<tr><td colspan="3" class="muted">No classes assigned yet</td></tr>`;
+    } catch (err) {
+      toast(err.message, true);
+    }
+  })();
+</script>
+</body>
+</html>

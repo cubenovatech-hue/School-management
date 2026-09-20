@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Announcements</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Notice board</div>
+        <h1>Announcements</h1>
+      </div>
+      <button class="btn" id="postBtn" style="display:none;" onclick="openModal()">+ Post announcement</button>
+    </div>
+
+    <div id="list"></div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2 style="margin-bottom:18px;">Post announcement</h2>
+    <form id="annForm">
+      <div class="field"><label>Title</label><input id="f_title" required /></div>
+      <div class="field"><label>Message</label><textarea id="f_body" rows="4" required></textarea></div>
+      <div class="field">
+        <label>Audience</label>
+        <select id="f_audience">
+          <option value="all">Everyone</option>
+          <option value="teachers">Teachers</option>
+          <option value="students">Students</option>
+          <option value="parents">Parents</option>
+        </select>
+      </div>
+      <button class="btn" type="submit" style="width:100%; justify-content:center;">Post</button>
+    </form>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  const user = requireAuth(["admin", "teacher", "student", "parent"]);
+  renderSidebar("announcements");
+
+  if (["admin", "teacher"].includes(user.role)) {
+    document.getElementById("postBtn").style.display = "inline-flex";
+  }
+
+  async function loadList() {
+    const items = await api("/misc/announcements");
+    document.getElementById("list").innerHTML =
+      items
+        .map(
+          (a) => `<div class="panel">
+            <div class="flex-between">
+              <h3>${a.pinned ? "📌 " : ""}${a.title}</h3>
+              <span class="pill new">${a.audience}</span>
+            </div>
+            <p style="margin:10px 0 6px; color: var(--ink-soft); font-size:14px; line-height:1.6;">${a.body}</p>
+            <div class="small-text muted">${a.postedBy ? a.postedBy.name : "Staff"} · ${fmtDate(a.createdAt)}</div>
+          </div>`
+        )
+        .join("") || `<div class="empty-state">No announcements yet.</div>`;
+  }
+
+  function openModal() { document.getElementById("modalBackdrop").classList.add("show"); }
+  function closeModal() { document.getElementById("modalBackdrop").classList.remove("show"); }
+
+  document.getElementById("annForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await api("/misc/announcements", {
+        method: "POST",
+        body: JSON.stringify({
+          title: document.getElementById("f_title").value,
+          body: document.getElementById("f_body").value,
+          audience: document.getElementById("f_audience").value,
+        }),
+      });
+      toast("Posted");
+      closeModal();
+      e.target.reset();
+      loadList();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  loadList().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>

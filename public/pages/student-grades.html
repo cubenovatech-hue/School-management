@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Grades — Student</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Student portal</div>
+        <h1>My grades</h1>
+      </div>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead><tr><th>Exam</th><th>Subject</th><th>Marks</th><th>Out of</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  const user = requireAuth(["student"]);
+  renderSidebar("grades");
+
+  (async function load() {
+    try {
+      const grades = await api(`/exams/grades/student/${user.studentProfile}`);
+      document.getElementById("rows").innerHTML = grades
+        .map(
+          (g) => `<tr>
+            <td>${g.exam.title}</td>
+            <td>${g.exam.subject}</td>
+            <td><strong>${g.marksObtained}</strong></td>
+            <td>${g.exam.maxMarks}</td>
+          </tr>`
+        )
+        .join("") || `<tr><td colspan="4" class="muted">No grades recorded yet</td></tr>`;
+    } catch (err) {
+      toast(err.message, true);
+    }
+  })();
+</script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Attendance — Admin</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Admin portal</div>
+        <h1>Attendance alerts</h1>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Students below 75% attendance</h2>
+      </div>
+      <table>
+        <thead><tr><th>Student</th><th>Present</th><th>Total marked</th><th>Percentage</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div id="empty" class="empty-state" style="display:none;">Nobody is below the threshold. Attendance looks healthy.</div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["admin"]);
+  renderSidebar("attendance");
+
+  (async function load() {
+    try {
+      const alerts = await api("/attendance/alerts/low?threshold=75");
+      document.getElementById("empty").style.display = alerts.length ? "none" : "block";
+      document.getElementById("rows").innerHTML = alerts
+        .map(
+          (a) => `<tr>
+            <td>${a.student ? a.student.name : "-"}</td>
+            <td>${a.present}</td>
+            <td>${a.total}</td>
+            <td><span class="pill ${a.percentage < 60 ? "absent" : "late"}">${a.percentage}%</span></td>
+          </tr>`
+        )
+        .join("");
+    } catch (err) {
+      toast(err.message, true);
+    }
+  })();
+</script>
+</body>
+</html>

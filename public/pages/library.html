@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Library</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow" id="eyebrow">Library</div>
+        <h1>Book catalog</h1>
+      </div>
+      <button class="btn" id="addBookBtn" style="display:none;" onclick="openModal()">+ Add book</button>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead><tr><th>Title</th><th>Author</th><th>Available</th><th>Total copies</th><th id="issueColHead"></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="panel" id="issuesPanel" style="display:none;">
+      <div class="panel-head"><h2>Issued books</h2></div>
+      <table>
+        <thead><tr><th>Book</th><th>Student</th><th>Due date</th><th>Status</th><th></th></tr></thead>
+        <tbody id="issueRows"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2 style="margin-bottom:18px;">Add book</h2>
+    <form id="bookForm">
+      <div class="field"><label>Title</label><input id="f_title" required /></div>
+      <div class="field"><label>Author</label><input id="f_author" /></div>
+      <div class="field"><label>ISBN</label><input id="f_isbn" /></div>
+      <div class="field"><label>Copies</label><input id="f_copies" type="number" value="1" /></div>
+      <button class="btn" type="submit" style="width:100%; justify-content:center;">Save book</button>
+    </form>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  const user = requireAuth(["admin", "student"]);
+  renderSidebar("library");
+
+  async function loadBooks() {
+    const books = await api("/library/books");
+    document.getElementById("rows").innerHTML = books
+      .map(
+        (b) => `<tr>
+          <td>${b.title}</td>
+          <td>${b.author || "-"}</td>
+          <td>${b.availableCopies}</td>
+          <td>${b.totalCopies}</td>
+          <td></td>
+        </tr>`
+      )
+      .join("");
+  }
+
+  async function loadIssues() {
+    if (user.role !== "admin") return;
+    document.getElementById("issuesPanel").style.display = "block";
+    const issues = await api("/library/issues?status=outstanding");
+    document.getElementById("issueRows").innerHTML =
+      issues
+        .map(
+          (i) => `<tr>
+            <td>${i.book ? i.book.title : "-"}</td>
+            <td>${i.student ? i.student.name : "-"}</td>
+            <td>${fmtDate(i.dueDate)}</td>
+            <td><span class="pill ${i.status === "overdue" ? "absent" : "present"}">${i.status}${i.fine ? " · ₹" + i.fine : ""}</span></td>
+            <td><button class="btn small secondary" onclick="returnBook('${i._id}')">Mark returned</button></td>
+          </tr>`
+        )
+        .join("") || `<tr><td colspan="5" class="muted">No outstanding issues</td></tr>`;
+  }
+
+  async function returnBook(id) {
+    try {
+      await api(`/library/return/${id}`, { method: "POST" });
+      toast("Book marked as returned");
+      loadBooks();
+      loadIssues();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  function openModal() { document.getElementById("modalBackdrop").classList.add("show"); }
+  function closeModal() { document.getElementById("modalBackdrop").classList.remove("show"); }
+
+  document.getElementById("bookForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await api("/library/books", {
+        method: "POST",
+        body: JSON.stringify({
+          title: document.getElementById("f_title").value,
+          author: document.getElementById("f_author").value,
+          isbn: document.getElementById("f_isbn").value,
+          totalCopies: Number(document.getElementById("f_copies").value) || 1,
+        }),
+      });
+      toast("Book added");
+      closeModal();
+      e.target.reset();
+      loadBooks();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  if (user.role === "admin") {
+    document.getElementById("addBookBtn").style.display = "inline-flex";
+  } else {
+    document.getElementById("eyebrow").textContent = "My library";
+  }
+
+  loadBooks().catch((err) => toast(err.message, true));
+  loadIssues().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>

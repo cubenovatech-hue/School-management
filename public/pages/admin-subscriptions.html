@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Subscriptions — Admin</title>
+<link rel="stylesheet" href="/css/style.css" />
+<style>
+  .plan-tag { display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+  .plan-tag.demo { background:var(--teacher-tint); color:var(--teacher); }
+  .plan-tag.monthly { background:var(--student-tint); color:var(--student); }
+  .plan-tag.six_month { background:var(--parent-tint); color:var(--parent); }
+  .plan-tag.annual { background:var(--admin-tint); color:var(--admin); }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Admin portal</div>
+        <h1>Subscription &amp; demo requests</h1>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Pending requests</h2>
+      </div>
+      <div id="pendingList"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>All requests</h2></div>
+      <table>
+        <thead><tr><th>School</th><th>Contact</th><th>Plan</th><th>Status</th><th>Requested</th></tr></thead>
+        <tbody id="allRows"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["admin"]);
+  renderSidebar("subscriptions");
+
+  const planLabel = { demo: "7-Day Demo", monthly: "Monthly", six_month: "6-Month", annual: "Annual" };
+
+  async function load() {
+    const [summary, pending, all] = await Promise.all([
+      api("/subscriptions/summary"),
+      api("/subscriptions?status=pending"),
+      api("/subscriptions"),
+    ]);
+
+    document.getElementById("statGrid").innerHTML = `
+      <div class="stat-tile"><div class="value">${summary.total}</div><div class="label">Total requests</div></div>
+      <div class="stat-tile"><div class="value">${summary.byStatus.pending || 0}</div><div class="label">Awaiting approval</div></div>
+      <div class="stat-tile"><div class="value">${summary.byStatus.approved || 0}</div><div class="label">Approved</div></div>
+      <div class="stat-tile"><div class="value">${summary.byPlan.demo || 0}</div><div class="label">Demo requests</div></div>
+    `;
+
+    document.getElementById("pendingList").innerHTML =
+      pending
+        .map(
+          (r) => `<div class="panel" style="border-left:4px solid var(--crm); margin-bottom:12px;">
+            <div class="flex-between" style="margin-bottom:6px;">
+              <h3>${r.schoolName}</h3>
+              <span class="plan-tag ${r.planType}">${planLabel[r.planType]}</span>
+            </div>
+            <div class="small-text muted" style="margin-bottom:10px;">${r.name} · ${r.email}${r.phone ? " · " + r.phone : ""} · requested ${fmtDate(r.createdAt)}</div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn small" onclick="approve('${r._id}')">Grant access</button>
+              <button class="btn small ghost" onclick="reject('${r._id}')">Reject</button>
+            </div>
+          </div>`
+        )
+        .join("") || `<div class="empty-state">No pending requests — you're all caught up.</div>`;
+
+    document.getElementById("allRows").innerHTML = all
+      .map(
+        (r) => `<tr>
+          <td>${r.schoolName}</td>
+          <td>${r.name}<div class="small-text muted">${r.email}</div></td>
+          <td><span class="plan-tag ${r.planType}">${planLabel[r.planType]}</span></td>
+          <td><span class="pill ${r.status === "approved" ? "enrolled" : r.status === "rejected" ? "lost" : "new"}">${r.status}</span></td>
+          <td>${fmtDate(r.createdAt)}</td>
+        </tr>`
+      )
+      .join("");
+  }
+
+  async function approve(id) {
+    try {
+      await api(`/subscriptions/${id}/approve`, { method: "PUT" });
+      toast("Access granted");
+      load();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  async function reject(id) {
+    if (!confirm("Reject this request?")) return;
+    try {
+      await api(`/subscriptions/${id}/reject`, { method: "PUT" });
+      toast("Request rejected");
+      load();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  load().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>

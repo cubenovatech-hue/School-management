@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Overview — Parent</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Parent portal</div>
+        <h1>Welcome, <span id="pName"></span></h1>
+      </div>
+    </div>
+
+    <div id="children"></div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  const user = requireAuth(["parent"]);
+  renderSidebar("overview");
+  document.getElementById("pName").textContent = user.name;
+
+  (async function load() {
+    try {
+      const results = await api("/dashboard/parent");
+      document.getElementById("children").innerHTML = results
+        .map(
+          (r) => `<div class="panel">
+            <div class="flex-between" style="margin-bottom:14px;">
+              <div>
+                <h2 class="mt-0">${r.child.name}</h2>
+                <div class="small-text muted">${r.child.schoolClass ? r.child.schoolClass.name + "-" + r.child.schoolClass.section : "-"} · Roll ${r.child.rollNo || "-"}</div>
+              </div>
+            </div>
+            <div class="stat-grid" style="margin-bottom:0;">
+              <div class="stat-tile"><div class="value">${r.attendancePercentage}%</div><div class="label">Attendance</div></div>
+              <div class="stat-tile"><div class="value" style="color:${r.feeBalance > 0 ? "var(--danger)" : "var(--ok)"}">${fmtCurrency(r.feeBalance)}</div><div class="label">Fee balance</div></div>
+            </div>
+          </div>`
+        )
+        .join("") || `<div class="empty-state">No children linked to this account.</div>`;
+    } catch (err) {
+      toast(err.message, true);
+    }
+  })();
+</script>
+</body>
+</html>

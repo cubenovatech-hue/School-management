@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Northfield — School management, run from one binder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Design tokens — shared with the Northfield app
+   ============================================================ */
+:root {
+  --ink: #1B2430;
+  --ink-soft: #4B5563;
+  --paper: #FAF7F0;
+  --paper-raised: #FFFFFF;
+  --line: #E4DFD3;
+
+  --admin: #2F6D5E;   --admin-tint: #E4F0EC;
+  --teacher: #3A5BA0; --teacher-tint: #E7ECF7;
+  --student: #C97A2B; --student-tint: #F8EBDA;
+  --parent: #8B4F9E;  --parent-tint: #F1E7F4;
+  --crm: #C0392B;     --crm-tint: #F8E4E1;
+
+  --shadow-lg: 0 30px 60px -25px rgba(27,36,48,0.28);
+  --shadow-sm: 0 1px 0 rgba(27,36,48,0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #F3F1EA;
+    --ink-soft: #B7BAC2;
+    --paper: #14181F;
+    --paper-raised: #1C222C;
+    --line: #2B3240;
+    --shadow-lg: 0 30px 60px -25px rgba(0,0,0,0.6);
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #F3F1EA;
+  --ink-soft: #B7BAC2;
+  --paper: #14181F;
+  --paper-raised: #1C222C;
+  --line: #2B3240;
+  --shadow-lg: 0 30px 60px -25px rgba(0,0,0,0.6);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Space Grotesk', -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, .display { font-family: 'Fraunces', serif; font-weight: 600; color: var(--ink); margin: 0; }
+p { margin: 0; }
+a { color: inherit; text-decoration: none; }
+img, svg { max-width: 100%; display: block; }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 28px; }
+
+button, input, textarea, select {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 15px;
+}
+input, textarea, select {
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper-raised);
+  color: var(--ink);
+  width: 100%;
+}
+input:focus, textarea:focus, select:focus {
+  outline: 2px solid var(--admin);
+  outline-offset: 1px;
+}
+label { display: block; font-size: 12.5px; color: var(--ink-soft); margin-bottom: 5px; font-weight: 500; }
+.field { margin-bottom: 14px; }
+
+/* ---------------- Buttons ---------------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 12px 22px;
+  font-size: 14px; font-weight: 600;
+  border-radius: 4px; border: none; cursor: pointer;
+  background: var(--admin); color: #fff;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.btn.outline { background: transparent; color: var(--ink); border: 1.5px solid var(--ink); }
+.btn.ghost { background: transparent; color: var(--ink-soft); }
+.btn.crm { background: var(--crm); }
+.btn.full { width: 100%; justify-content: center; }
+.btn.small { padding: 8px 16px; font-size: 13px; }
+
+/* ---------------- Offer banner + Nav (sticky as one unit) ---------------- */
+.sticky-head { position: sticky; top: 0; z-index: 40; }
+
+.offer-banner {
+  background: var(--ink);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  padding: 9px 16px;
+  font-size: 13px;
+  text-align: center;
+  flex-wrap: wrap;
+}
+.offer-text strong { color: #F0B23A; font-variant-numeric: tabular-nums; }
+.offer-btn {
+  background: var(--crm); color: #fff; border: none; border-radius: 4px;
+  padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.offer-btn:hover { filter: brightness(1.1); }
+
+/* ---------------- Nav ---------------- */
+.nav {
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.nav .row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; }
+.nav .logo { display: flex; align-items: center; gap: 10px; font-family: 'Fraunces', serif; font-weight: 600; font-size: 19px; }
+.nav .logo .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--admin); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.nav .links { display: flex; gap: 28px; font-size: 14px; font-weight: 500; }
+.nav .links a { color: var(--ink-soft); transition: color 0.15s; }
+.nav .links a:hover { color: var(--ink); }
+.nav .actions { display: flex; gap: 10px; align-items: center; }
+.nav .hamburger { display: none; background: none; border: none; cursor: pointer; padding: 6px; }
+.nav .hamburger span { display: block; width: 22px; height: 2px; background: var(--ink); margin: 5px 0; }
+
+/* ---------------- Hero ---------------- */
+.hero {
+  padding: 76px 0 90px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 50px; align-items: center;
+}
+.hero .eyebrow { font-size: 13px; color: var(--admin); font-weight: 600; margin-bottom: 14px; }
+.hero h1 { font-size: 50px; line-height: 1.08; letter-spacing: -0.01em; margin-bottom: 20px; }
+.hero p.lead { font-size: 17.5px; color: var(--ink-soft); max-width: 46ch; margin-bottom: 30px; }
+.hero .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 26px; }
+.hero .microcopy { font-size: 13px; color: var(--ink-soft); }
+
+.tab-stack {
+  position: relative;
+  height: 420px;
+}
+.tab-card {
+  position: absolute;
+  left: 0; right: 0;
+  border-radius: 8px;
+  padding: 20px 22px;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(28px);
+  animation: tabIn 0.7s cubic-bezier(.2,.8,.2,1) forwards;
+  border: 1px solid var(--line);
+}
+.tab-card .role { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+.tab-card .headline { font-family: 'Fraunces', serif; font-weight: 600; font-size: 17px; }
+.tab-card .sub { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+
+.tab-card.admin   { background: var(--admin-tint);   top: 0px;   z-index: 5; animation-delay: 0.05s; }
+.tab-card.teacher { background: var(--teacher-tint); top: 62px;  z-index: 4; animation-delay: 0.18s; }
+.tab-card.student { background: var(--student-tint); top: 124px; z-index: 3; animation-delay: 0.31s; }
+.tab-card.parent  { background: var(--parent-tint);  top: 186px; z-index: 2; animation-delay: 0.44s; }
+.tab-card.crm     { background: var(--crm-tint);     top: 248px; z-index: 1; animation-delay: 0.57s; }
+
+.tab-card.admin .role   { color: var(--admin); }
+.tab-card.teacher .role { color: var(--teacher); }
+.tab-card.student .role { color: var(--student); }
+.tab-card.parent .role  { color: var(--parent); }
+.tab-card.crm .role     { color: var(--crm); }
+
+@keyframes tabIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------------- Reveal on scroll ---------------- */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.reveal.in { opacity: 1; transform: translateY(0); }
+
+/* ---------------- Sections ---------------- */
+section { padding: 84px 0; }
+.section-head { max-width: 560px; margin-bottom: 46px; }
+.section-head .eyebrow { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--crm); margin-bottom: 10px; }
+.section-head h2 { font-size: 34px; line-height: 1.15; margin-bottom: 12px; }
+.section-head p { color: var(--ink-soft); font-size: 15.5px; }
+
+/* ---------------- Feature grid ---------------- */
+.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.feature-card {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent, var(--admin));
+  border-radius: 6px;
+  padding: 24px 22px;
+}
+.feature-card .icon { font-size: 22px; margin-bottom: 14px; }
+.feature-card h3 { font-size: 16.5px; margin-bottom: 8px; }
+.feature-card p { font-size: 13.8px; color: var(--ink-soft); }
+
+/* ---------------- CRM spotlight ---------------- */
+.crm-spotlight {
+  background: var(--ink);
+  color: #EDEDE6;
+  border-radius: 14px;
+  padding: 56px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 44px;
+  align-items: center;
+}
+.crm-spotlight .eyebrow { color: #E98A7B; }
+.crm-spotlight h2 { color: #fff; }
+.crm-spotlight p { color: #C7CAD1; font-size: 15px; margin: 14px 0 22px; max-width: 42ch; }
+.crm-spotlight ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.crm-spotlight li { font-size: 14px; color: #E5E6E9; display: flex; gap: 10px; align-items: flex-start; }
+.crm-spotlight li::before { content: '—'; color: var(--crm); flex-shrink: 0; }
+
+.mini-kanban { display: flex; gap: 10px; overflow: hidden; }
+.mini-col { background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; flex: 1; min-width: 0; }
+.mini-col .head { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.03em; color: #9BA0AC; margin-bottom: 8px; }
+.mini-card {
+  background: rgba(255,255,255,0.08);
+  border-left: 2px solid var(--crm);
+  border-radius: 3px;
+  padding: 8px 9px;
+  margin-bottom: 6px;
+  font-size: 10.5px;
+  opacity: 0;
+  animation: cardSlide 0.5s ease forwards;
+}
+@keyframes cardSlide { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ---------------- Stats band ---------------- */
+.stats-band { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; padding: 50px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.stats-band .stat .n { font-family: 'Fraunces', serif; font-size: 36px; font-weight: 600; }
+.stats-band .stat .l { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+
+/* ---------------- Pricing ---------------- */
+.pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.price-card {
+  position: relative;
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 30px 26px;
+  text-align: center;
+}
+.price-card.featured {
+  border: 2px solid var(--crm);
+  transform: scale(1.03);
+  box-shadow: var(--shadow-lg);
+}
+.price-badge {
+  position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+  background: var(--crm); color: #fff; font-size: 11px; font-weight: 700;
+  padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.03em;
+}
+.price-plan { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.price-amount { font-family: 'Fraunces', serif; font-size: 34px; font-weight: 700; }
+.price-amount span { font-size: 14px; font-weight: 400; color: var(--ink-soft); }
+.price-sub { font-size: 12.5px; color: var(--ink-soft); margin: 4px 0 20px; }
+.price-features { list-style: none; margin: 0 0 22px; padding: 0; text-align: left; display: flex; flex-direction: column; gap: 10px; }
+.price-features li { font-size: 13.8px; padding-left: 22px; position: relative; }
+.price-features li::before { content: '✓'; position: absolute; left: 0; color: var(--admin); font-weight: 700; }
+
+/* ---------------- Contact & Support ---------------- */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; }
+.faq-item { border-bottom: 1px solid var(--line); padding: 18px 0; }
+.faq-item button {
+  width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+  display: flex; justify-content: space-between; align-items: center;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: var(--ink);
+  padding: 0;
+}
+.faq-item .plus { font-size: 18px; transition: transform 0.2s ease; color: var(--ink-soft); }
+.faq-item.open .plus { transform: rotate(45deg); }
+.faq-item .answer { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; font-size: 14px; color: var(--ink-soft); }
+.faq-item.open .answer { max-height: 200px; padding-top: 12px; }
+
+.form-panel { background: var(--paper-raised); border: 1px solid var(--line); border-radius: 8px; padding: 30px; }
+.confirm-msg { display: none; background: var(--admin-tint); color: var(--admin); padding: 12px 14px; border-radius: 4px; font-size: 13.5px; margin-top: 4px; }
+.confirm-msg.show { display: block; }
+
+/* ---------------- Footer ---------------- */
+footer { padding: 48px 0 60px; border-top: 1px solid var(--line); }
+footer .row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+footer .small { font-size: 13px; color: var(--ink-soft); }
+footer .links { display: flex; gap: 20px; font-size: 13.5px; }
+
+/* ---------------- Modal ---------------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(27,36,48,0.5);
+  display: none; align-items: center; justify-content: center; z-index: 60; padding: 20px;
+}
+.modal-backdrop.show { display: flex; }
+.modal {
+  background: var(--paper-raised); border-radius: 8px; padding: 32px;
+  width: 100%; max-width: 400px; box-shadow: var(--shadow-lg);
+  border-top: 5px solid var(--admin);
+  animation: modalIn 0.25s ease;
+}
+@keyframes modalIn { from { opacity: 0; transform: scale(0.97) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+.modal-close { float: right; background: none; border: none; font-size: 20px; cursor: pointer; color: var(--ink-soft); }
+.modal .switcher { text-align: center; font-size: 13.5px; color: var(--ink-soft); margin-top: 16px; }
+.modal .switcher a { color: var(--admin); font-weight: 600; cursor: pointer; }
+.modal .note { font-size: 11.5px; color: var(--ink-soft); margin-top: 14px; background: var(--paper); padding: 10px 12px; border-radius: 4px; }
+
+/* ---------------- Responsive ---------------- */
+@media (max-width: 860px) {
+  .nav .links { display: none; }
+  .nav .hamburger { display: block; }
+  .hero { grid-template-columns: 1fr; padding-top: 40px; }
+  .hero h1 { font-size: 36px; }
+  .tab-stack { height: 300px; margin-top: 10px; }
+  .tab-card { padding: 14px 16px; }
+  .tab-card.admin { top: 0; } .tab-card.teacher { top: 46px; } .tab-card.student { top: 92px; } .tab-card.parent { top: 138px; } .tab-card.crm { top: 184px; }
+  .feature-grid { grid-template-columns: 1fr; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  .price-card.featured { transform: none; }
+  .crm-spotlight { grid-template-columns: 1fr; padding: 32px 24px; }
+  .stats-band { grid-template-columns: repeat(2, 1fr); }
+  .split { grid-template-columns: 1fr; gap: 36px; }
+  section { padding: 56px 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="sticky-head">
+<div class="offer-banner" id="offerBanner">
+  <span class="offer-text">🎉 Free 7-day demo, full access — offer ends in <strong id="countdown">--:--:--:--</strong></span>
+  <button class="offer-btn" onclick="openSubModal('demo')">Request demo</button>
+</div>
+
+<nav class="nav">
+  <div class="wrap row">
+    <div class="logo"><span class="mark">N</span> Northfield</div>
+    <div class="links">
+      <a href="#features">Product</a>
+      <a href="#crm">Admissions CRM</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#support">Support</a>
+      <a href="#contact">Contact</a>
+    </div>
+    <div class="actions">
+      <a class="btn small" href="/login.html">Log in</a>
+      <button class="hamburger" onclick="toggleMobileNav()" aria-label="Menu"><span></span><span></span><span></span></button>
+    </div>
+  </div>
+  <div id="mobileNav" style="display:none; padding: 0 28px 18px; flex-direction:column; gap:14px;">
+    <a href="#features" onclick="toggleMobileNav()">Product</a>
+    <a href="#crm" onclick="toggleMobileNav()">Admissions CRM</a>
+    <a href="#pricing" onclick="toggleMobileNav()">Pricing</a>
+    <a href="#support" onclick="toggleMobileNav()">Support</a>
+    <a href="#contact" onclick="toggleMobileNav()">Contact</a>
+  </div>
+</nav>
+</div>
+
+<header class="wrap hero">
+  <div>
+    <div class="eyebrow">School management, tab by tab</div>
+    <h1>Run admissions, classrooms, and parents from one binder.</h1>
+    <p class="lead">Five role-based portals and a built-in admissions pipeline — so the enquiry that becomes an enrolled student never falls through a spreadsheet again.</p>
+    <div class="cta-row">
+      <button class="btn crm" onclick="openSubModal('demo')">Start free 7-day demo</button>
+      <a class="btn outline" href="/login.html">Log in to your portal</a>
+    </div>
+    <div class="microcopy">No card needed for the demo. Paid plans are approved by our team within one business day.</div>
+  </div>
+
+  <div class="tab-stack" aria-hidden="true">
+    <div class="tab-card admin">
+      <div class="role">Admin</div>
+      <div class="headline">₹1,25,000 collected this term</div>
+      <div class="sub">Fee ledger, defaulters, staff — all in view</div>
+    </div>
+    <div class="tab-card teacher">
+      <div class="role">Teacher</div>
+      <div class="headline">Attendance marked in 40 seconds</div>
+      <div class="sub">Bulk roster entry, per-class grading</div>
+    </div>
+    <div class="tab-card student">
+      <div class="role">Student</div>
+      <div class="headline">92% attendance this month</div>
+      <div class="sub">Grades, library, notices — one login</div>
+    </div>
+    <div class="tab-card parent">
+      <div class="role">Parent</div>
+      <div class="headline">Two children, one dashboard</div>
+      <div class="sub">Fees and attendance, side by side</div>
+    </div>
+    <div class="tab-card crm">
+      <div class="role">Admissions CRM</div>
+      <div class="headline">6 enquiries in the pipeline</div>
+      <div class="sub">Nothing gets forgotten before enrollment</div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <div class="eyebrow">What's included</div>
+      <h2>Everything a front office actually touches</h2>
+      <p>Not just a gradebook — the operational things schools ask for and rarely get.</p>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card reveal" style="--accent: var(--crm);">
+        <div class="icon">🧭</div>
+        <h3>Admissions CRM</h3>
+        <p>A kanban pipeline from first enquiry to enrolled, with follow-up reminders so no lead goes cold.</p>
+      </div>
+      <div class="feature-card reveal" style="--accent: var(--admin);">
+        <div class="icon">💳</div>
+        <h3>Fee ledger</h3>
+        <p>Running balances, payment history, and an automatic defaulters list — not a paid/unpaid checkbox.</p>
+      </div>
+      <div class="feature-card reveal" style="--accent: var(--teacher);">
+        <div class="icon">📋</div>
+        <h3>Attendance alerts</h3>
+        <p>Auto-flags students who drop below a threshold you set, instead of a raw log nobody reviews.</p>
+      </div>
+      <div class="feature-card reveal" style="--accent: var(--student);">
+        <div class="icon">📚</div>
+        <h3>Library</h3>
+        <p>Issue and return workflow with automatic overdue fine calculation, per day.</p>
+      </div>
+      <div class="feature-card reveal" style="--accent: var(--parent);">
+        <div class="icon">💬</div>
+        <h3>Messaging</h3>
+        <p>Direct messages between any two accounts — a teacher and a parent, without a phone tree.</p>
+      </div>
+      <div class="feature-card reveal" style="--accent: var(--ink-soft);">
+        <div class="icon">📣</div>
+        <h3>Announcements</h3>
+        <p>Post to everyone, or just teachers, students, or parents — targeted, not one big inbox.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="crm">
+  <div class="wrap">
+    <div class="crm-spotlight reveal">
+      <div>
+        <div class="eyebrow">The part most systems skip</div>
+        <h2>Enquiries don't become enrollments by themselves.</h2>
+        <p>Most school software manages students you already have. Northfield also manages the ones you're still trying to enroll.</p>
+        <ul>
+          <li>Six-stage pipeline: New → Contacted → Visit → Applied → Enrolled or Lost</li>
+          <li>A timeline of every call, note, and visit per family</li>
+          <li>Follow-ups that surface automatically when they're due or overdue</li>
+          <li>Conversion rate and source breakdown, computed for you</li>
+        </ul>
+      </div>
+      <div class="mini-kanban" id="miniKanban"></div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="stats-band reveal">
+    <div class="stat"><div class="n">5</div><div class="l">Role-based portals</div></div>
+    <div class="stat"><div class="n">6</div><div class="l">CRM pipeline stages</div></div>
+    <div class="stat"><div class="n">1</div><div class="l">Login, per person</div></div>
+    <div class="stat"><div class="n">0</div><div class="l">Spreadsheets required</div></div>
+  </div>
+</div>
+
+<section id="pricing">
+  <div class="wrap">
+    <div class="section-head reveal" style="margin: 0 auto 46px; text-align:center;">
+      <div class="eyebrow" style="text-align:center;">Pricing</div>
+      <h2>Simple plans, approved by a human</h2>
+      <p style="margin: 0 auto;">Start with a free 7-day demo — full access, nothing locked. Choose a plan when you're ready, and our team activates it within one business day.</p>
+    </div>
+
+    <div class="pricing-grid">
+      <div class="price-card reveal">
+        <div class="price-plan">Monthly</div>
+        <div class="price-amount">₹4,999<span>/mo</span></div>
+        <div class="price-sub">Billed every month</div>
+        <ul class="price-features">
+          <li>All 5 role-based portals</li>
+          <li>Admissions CRM included</li>
+          <li>Email support</li>
+        </ul>
+        <button class="btn outline full" onclick="openSubModal('monthly')">Choose Monthly</button>
+      </div>
+
+      <div class="price-card featured reveal">
+        <div class="price-badge">Most popular</div>
+        <div class="price-plan">6-Month</div>
+        <div class="price-amount">₹24,999<span>/6mo</span></div>
+        <div class="price-sub">≈ ₹4,166/mo · save 17%</div>
+        <ul class="price-features">
+          <li>Everything in Monthly</li>
+          <li>Priority email + chat support</li>
+          <li>Onboarding call included</li>
+        </ul>
+        <button class="btn crm full" onclick="openSubModal('six_month')">Choose 6-Month</button>
+      </div>
+
+      <div class="price-card reveal">
+        <div class="price-plan">Annual</div>
+        <div class="price-amount">₹44,999<span>/yr</span></div>
+        <div class="price-sub">≈ ₹3,750/mo · save 25%</div>
+        <ul class="price-features">
+          <li>Everything in 6-Month</li>
+          <li>Dedicated support contact</li>
+          <li>Data export &amp; migration help</li>
+        </ul>
+        <button class="btn outline full" onclick="openSubModal('annual')">Choose Annual</button>
+      </div>
+    </div>
+    <div class="microcopy" style="text-align:center; margin-top:22px;">Prices shown are placeholders — edit them freely in the code to match your actual pricing.</div>
+  </div>
+</section>
+
+<section id="support">
+  <div class="wrap split">
+    <div>
+      <div class="section-head reveal" style="margin-bottom: 26px;">
+        <div class="eyebrow">Support</div>
+        <h2>Common questions</h2>
+      </div>
+      <div id="faqList"></div>
+    </div>
+    <div id="contact">
+      <div class="section-head reveal" style="margin-bottom: 26px;">
+        <div class="eyebrow">Contact</div>
+        <h2>Talk to us</h2>
+        <p>Tell us about your school and we'll get back to you.</p>
+      </div>
+      <div class="form-panel reveal">
+        <form id="contactForm">
+          <div class="field"><label>Name</label><input id="contactName" required /></div>
+          <div class="field"><label>School email</label><input id="contactEmail" type="email" required /></div>
+          <div class="field"><label>Message</label><textarea id="contactMessage" rows="4" required></textarea></div>
+          <button class="btn full" type="submit" id="contactSubmitBtn">Send message</button>
+          <div class="confirm-msg" id="contactConfirm">Thanks — your message has been sent to the school office.</div>
+          <div class="confirm-msg" id="contactError" style="background:var(--crm-tint); color:var(--crm);">Something went wrong sending that — please try again in a moment.</div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap row">
+    <div class="logo" style="font-size:16px;"><span class="mark" style="width:24px;height:24px;font-size:12px;">N</span> Northfield</div>
+    <div class="links">
+      <a href="#features">Product</a>
+      <a href="#crm">CRM</a>
+      <a href="#support">Support</a>
+      <a href="#contact">Contact</a>
+    </div>
+    <div class="small">A school management prototype — customize freely.</div>
+  </div>
+</footer>
+
+<div class="modal-backdrop" id="subBackdrop" onclick="if(event.target===this) closeSubModal()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeSubModal()">×</button>
+    <h2 id="subModalTitle" style="margin-bottom:4px;">Request access</h2>
+    <p style="color:var(--ink-soft); font-size:13.5px; margin-bottom:22px;" id="subModalSub">Tell us about your school and we'll set you up.</p>
+    <form id="subForm">
+      <input type="hidden" id="subPlanType" />
+      <div class="field"><label>Your name</label><input id="subName" required /></div>
+      <div class="field"><label>Email</label><input id="subEmail" type="email" required /></div>
+      <div class="field"><label>Phone <span class="muted small-text">(optional)</span></label><input id="subPhone" /></div>
+      <div class="field"><label>School name</label><input id="subSchool" required /></div>
+      <button class="btn full crm" type="submit" id="subSubmitBtn">Submit request</button>
+      <div class="confirm-msg" id="subConfirm">Thanks — your request has been sent. Our team will review and grant access soon.</div>
+      <div class="confirm-msg" id="subError" style="background:var(--crm-tint); color:var(--crm);">Something went wrong — please try again.</div>
+    </form>
+    <div class="note">Requests are reviewed by our team and access is granted manually — usually within one business day.</div>
+  </div>
+</div>
+
+
+
+<script>
+/* ---------------- Mobile nav ---------------- */
+function toggleMobileNav() {
+  const el = document.getElementById('mobileNav');
+  el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+}
+
+/* ---------------- Mobile nav auto-close on outside click ---------------- */
+
+/* ---------------- Scroll reveal ---------------- */
+const revealEls = document.querySelectorAll('.reveal');
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.15 });
+  revealEls.forEach((el) => io.observe(el));
+} else {
+  revealEls.forEach((el) => el.classList.add('in'));
+}
+
+/* ---------------- Mini kanban (CRM spotlight) ---------------- */
+const kanbanData = [
+  { label: 'New', color: '#C0392B', cards: ['Ishaan Verma', 'Zara Khan'] },
+  { label: 'Contacted', color: '#C97A2B', cards: ['Yusuf Ali'] },
+  { label: 'Visit', color: '#3A5BA0', cards: ['Anaya Pillai'] },
+  { label: 'Applied', color: '#8B4F9E', cards: ['Kabir M.'] },
+  { label: 'Enrolled', color: '#2F6D5E', cards: ['Rohan Das', 'Meera S.'] },
+];
+const kanbanEl = document.getElementById('miniKanban');
+let cardDelay = 0;
+kanbanEl.innerHTML = kanbanData.map((col) => `
+  <div class="mini-col">
+    <div class="head">${col.label}</div>
+    ${col.cards.map((c) => {
+      const html = `<div class="mini-card" style="border-left-color:${col.color}; animation-delay:${(cardDelay += 0.08).toFixed(2)}s;">${c}</div>`;
+      return html;
+    }).join('')}
+  </div>
+`).join('');
+
+/* ---------------- FAQ ---------------- */
+const faqs = [
+  { q: 'Do I need to install anything?', a: 'You need Node.js and a MongoDB database (local or a free Atlas cluster). The app itself runs with one command once configured.' },
+  { q: 'Can parents see fee and attendance data for more than one child?', a: 'Yes — a parent account can be linked to multiple students, and the parent dashboard shows each child separately.' },
+  { q: 'How is the admissions pipeline different from just a spreadsheet?', a: 'Every lead gets a stage, an owner, an activity timeline, and a follow-up date that surfaces automatically when due — so nothing depends on someone remembering to check a tab.' },
+  { q: 'Is my data shared with anyone?', a: 'No. This runs on your own server and your own MongoDB database. There is no third-party data sharing built in.' },
+];
+document.getElementById('faqList').innerHTML = faqs.map((f, i) => `
+  <div class="faq-item" id="faq-${i}">
+    <button onclick="toggleFaq(${i})">
+      <span>${f.q}</span>
+      <span class="plus">+</span>
+    </button>
+    <div class="answer">${f.a}</div>
+  </div>
+`).join('');
+function toggleFaq(i) {
+  document.getElementById('faq-' + i).classList.toggle('open');
+}
+
+/* ---------------- Live countdown for the demo offer ---------------- */
+(function initCountdown() {
+  const STORAGE_KEY = 'northfield_demo_deadline';
+  let deadline = localStorage.getItem(STORAGE_KEY);
+  if (!deadline || new Date(deadline) < new Date()) {
+    deadline = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    localStorage.setItem(STORAGE_KEY, deadline);
+  }
+  const el = document.getElementById('countdown');
+  function tick() {
+    const diff = new Date(deadline) - new Date();
+    if (diff <= 0) {
+      el.textContent = "today — request now";
+      return;
+    }
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    el.textContent = `${pad(d)}d ${pad(h)}:${pad(m)}:${pad(s)}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+
+/* ---------------- Subscription / demo request modal ---------------- */
+const subTitles = {
+  demo: ['Start your free 7-day demo', 'Full access, no card required.'],
+  monthly: ['Request the Monthly plan', "We'll set you up and confirm billing details."],
+  six_month: ['Request the 6-Month plan', "We'll set you up and confirm billing details."],
+  annual: ['Request the Annual plan', "We'll set you up and confirm billing details."],
+};
+function openSubModal(planType) {
+  document.getElementById('subPlanType').value = planType;
+  const [title, sub] = subTitles[planType] || subTitles.demo;
+  document.getElementById('subModalTitle').textContent = title;
+  document.getElementById('subModalSub').textContent = sub;
+  document.getElementById('subConfirm').classList.remove('show');
+  document.getElementById('subError').classList.remove('show');
+  document.getElementById('subBackdrop').classList.add('show');
+}
+function closeSubModal() {
+  document.getElementById('subBackdrop').classList.remove('show');
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSubModal(); });
+
+document.getElementById('subForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('subSubmitBtn');
+  const confirmEl = document.getElementById('subConfirm');
+  const errorEl = document.getElementById('subError');
+  confirmEl.classList.remove('show');
+  errorEl.classList.remove('show');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  try {
+    const res = await fetch('/api/subscriptions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        planType: document.getElementById('subPlanType').value,
+        name: document.getElementById('subName').value,
+        email: document.getElementById('subEmail').value,
+        phone: document.getElementById('subPhone').value,
+        schoolName: document.getElementById('subSchool').value,
+      }),
+    });
+    if (!res.ok) throw new Error();
+    confirmEl.classList.add('show');
+    e.target.reset();
+  } catch {
+    errorEl.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Submit request';
+  }
+});
+
+/* ---------------- Contact form (real submit, no login required) ---------------- */
+document.getElementById('contactForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('contactSubmitBtn');
+  const confirmEl = document.getElementById('contactConfirm');
+  const errorEl = document.getElementById('contactError');
+  confirmEl.classList.remove('show');
+  errorEl.classList.remove('show');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+
+  try {
+    const res = await fetch('/api/contact', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: document.getElementById('contactName').value,
+        email: document.getElementById('contactEmail').value,
+        message: document.getElementById('contactMessage').value,
+      }),
+    });
+    if (!res.ok) throw new Error();
+    confirmEl.classList.add('show');
+    e.target.reset();
+  } catch {
+    errorEl.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send message';
+  }
+});
+</script>
+
+</body>
+</html>

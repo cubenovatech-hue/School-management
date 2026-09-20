@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Timetable — Student</title>
+<link rel="stylesheet" href="/css/style.css" />
+<style>
+  .tt-table { width: 100%; border-collapse: collapse; }
+  .tt-table th { background: var(--paper); font-size: 11px; text-transform: uppercase; color: var(--ink-soft); padding: 8px; border: 1px solid var(--line); }
+  .tt-table td { border: 1px solid var(--line); padding: 10px; vertical-align: top; height: 60px; width: 14%; }
+  .tt-table td.filled { background: var(--student-tint); }
+  .tt-table .subj { font-weight: 600; font-size: 13px; }
+  .tt-table .cls { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
+  .period-col { font-weight: 600; font-size: 12.5px; background: var(--paper); text-align: center; width: 60px; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Student portal</div>
+        <h1>My timetable</h1>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="overflow-x:auto;">
+        <table class="tt-table" id="grid"></table>
+      </div>
+      <div id="empty" class="empty-state" style="display:none;">No timetable has been set up for your class yet.</div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  const user = requireAuth(["student"]);
+  renderSidebar("timetable");
+
+  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+  (async function load() {
+    try {
+      const students = await api("/students"); // auto-filtered to self for role=student
+      const me = students[0];
+      if (!me || !me.schoolClass) {
+        document.getElementById("empty").style.display = "block";
+        return;
+      }
+      const slots = await api(`/misc/timetable/class/${me.schoolClass._id}`);
+      const byKey = {};
+      slots.forEach((s) => { byKey[`${s.day}-${s.period}`] = s; });
+
+      if (!slots.length) {
+        document.getElementById("empty").style.display = "block";
+      }
+
+      let html = `<tr><th class="period-col">Period</th>${DAYS.map((d) => `<th>${d}</th>`).join("")}</tr>`;
+      PERIODS.forEach((p) => {
+        html += `<tr><td class="period-col">${p}</td>`;
+        DAYS.forEach((day) => {
+          const slot = byKey[`${day}-${p}`];
+          if (slot) {
+            html += `<td class="filled">
+              <div class="subj">${slot.subject}</div>
+              <div class="cls">${slot.teacher ? slot.teacher.name : ""}${slot.startTime ? " · " + slot.startTime : ""}</div>
+            </td>`;
+          } else {
+            html += `<td></td>`;
+          }
+        });
+        html += `</tr>`;
+      });
+      document.getElementById("grid").innerHTML = html;
+    } catch (err) {
+      toast(err.message, true);
+    }
+  })();
+</script>
+</body>
+</html>

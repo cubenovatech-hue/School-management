@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admissions CRM — Admin</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Admissions CRM</div>
+        <h1>Enquiry pipeline</h1>
+      </div>
+      <button class="btn" style="background:var(--crm);" onclick="openNewLead()">+ New enquiry</button>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div id="followupPanel" class="panel" style="display:none; border-left:4px solid var(--crm);">
+      <div class="panel-head"><h2>Follow-ups due or overdue</h2></div>
+      <div id="followupList"></div>
+    </div>
+
+    <div class="panel">
+      <div class="kanban" id="board"></div>
+    </div>
+  </main>
+</div>
+
+<!-- Lead detail / new lead modal -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal wide">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["admin"]);
+  renderSidebar("leads");
+
+  const STAGES = ["new", "contacted", "visit_scheduled", "application_submitted", "enrolled", "lost"];
+  let currentLeadId = null;
+
+  async function loadBoard() {
+    const [board, stats, followups] = await Promise.all([
+      api("/leads/board"),
+      api("/leads/pipeline/stats"),
+      api("/leads/followups/due"),
+    ]);
+
+    document.getElementById("statGrid").innerHTML = `
+      <div class="stat-tile"><div class="value">${stats.total}</div><div class="label">Total enquiries</div></div>
+      <div class="stat-tile"><div class="value">${stats.byStage.enrolled || 0}</div><div class="label">Enrolled</div></div>
+      <div class="stat-tile"><div class="value">${stats.conversionRate}%</div><div class="label">Conversion rate</div></div>
+      <div class="stat-tile"><div class="value">${followups.length}</div><div class="label">Follow-ups due</div></div>
+    `;
+
+    if (followups.length) {
+      document.getElementById("followupPanel").style.display = "block";
+      document.getElementById("followupList").innerHTML = followups
+        .map(
+          (l) => `<div class="flex-between" style="padding:8px 0; border-bottom:1px solid var(--line);">
+            <div>
+              <strong>${l.childName}</strong> <span class="muted small-text">(${l.guardianName}, ${l.phone})</span>
+            </div>
+            <div class="small-text" style="color:${new Date(l.nextFollowUp) < new Date() ? "var(--danger)" : "var(--ink-soft)"};">
+              Due ${fmtDate(l.nextFollowUp)}
+              <button class="btn ghost small" style="margin-left:8px;" onclick="openLead('${l._id}')">Open</button>
+            </div>
+          </div>`
+        )
+        .join("");
+    } else {
+      document.getElementById("followupPanel").style.display = "none";
+    }
+
+    document.getElementById("board").innerHTML = STAGES.map((stage) => `
+      <div class="kanban-col">
+        <h4><span>${stageLabel(stage)}</span><span>${board[stage].length}</span></h4>
+        ${board[stage]
+          .map(
+            (l) => `<div class="lead-card" onclick="openLead('${l._id}')">
+              <div class="name">${l.childName}</div>
+              <div class="meta">${l.interestedGrade} · ${l.guardianName}</div>
+              ${l.nextFollowUp ? `<div class="meta" style="margin-top:4px;">Next: ${fmtDate(l.nextFollowUp)}</div>` : ""}
+            </div>`
+          )
+          .join("") || `<div class="muted small-text">No leads</div>`}
+      </div>
+    `).join("");
+  }
+
+  async function openLead(id) {
+    currentLeadId = id;
+    const lead = await api(`/leads/${id}`);
+    document.getElementById("modalBody").innerHTML = `
+      <div class="flex-between" style="margin-bottom:4px;">
+        <h2 class="mt-0">${lead.childName}</h2>
+        <span class="pill ${lead.stage}">${stageLabel(lead.stage)}</span>
+      </div>
+      <div class="muted small-text" style="margin-bottom:18px;">
+        Guardian: ${lead.guardianName} · ${lead.phone} ${lead.email ? "· " + lead.email : ""}
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px;">
+        <div class="field mb-0">
+          <label>Move to stage</label>
+          <select id="stageSelect">
+            ${STAGES.map((s) => `<option value="${s}" ${s === lead.stage ? "selected" : ""}>${stageLabel(s)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field mb-0">
+          <label>Next follow-up</label>
+          <input type="date" id="followupDate" value="${lead.nextFollowUp ? new Date(lead.nextFollowUp).toISOString().slice(0,10) : ""}" />
+        </div>
+      </div>
+      <button class="btn secondary small" onclick="saveLeadUpdates()">Save changes</button>
+
+      <h3 style="margin-top:22px; margin-bottom:10px;">Activity</h3>
+      <div id="activityList">
+        ${lead.activities
+          .slice()
+          .reverse()
+          .map(
+            (a) => `<div class="timeline-item">
+              <div>${a.text}</div>
+              <div class="when">${a.type} · ${fmtDate(a.createdAt)}${a.createdBy ? " · " + a.createdBy.name : ""}</div>
+            </div>`
+          )
+          .join("")}
+      </div>
+
+      <div class="field" style="margin-top:14px;">
+        <label>Add a note</label>
+        <textarea id="newNote" rows="2" placeholder="Called guardian, discussed schedule..."></textarea>
+      </div>
+      <button class="btn small" onclick="addActivity()">Add note</button>
+    `;
+    document.getElementById("modalBackdrop").classList.add("show");
+  }
+
+  function openNewLead() {
+    currentLeadId = null;
+    document.getElementById("modalBody").innerHTML = `
+      <h2 style="margin-bottom:18px;">New admission enquiry</h2>
+      <form id="newLeadForm">
+        <div class="field"><label>Child's name</label><input id="nl_child" required /></div>
+        <div class="field"><label>Interested grade</label><input id="nl_grade" required placeholder="Grade 3" /></div>
+        <div class="field"><label>Guardian name</label><input id="nl_guardian" required /></div>
+        <div class="field"><label>Phone</label><input id="nl_phone" required /></div>
+        <div class="field"><label>Email</label><input id="nl_email" type="email" /></div>
+        <div class="field">
+          <label>Source</label>
+          <select id="nl_source">
+            <option value="walk_in">Walk-in</option>
+            <option value="website">Website</option>
+            <option value="referral">Referral</option>
+            <option value="phone">Phone</option>
+            <option value="event">Event</option>
+            <option value="social_media">Social media</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <button class="btn" style="width:100%; justify-content:center; background:var(--crm);" type="submit">Create enquiry</button>
+      </form>
+    `;
+    document.getElementById("modalBackdrop").classList.add("show");
+
+    document.getElementById("newLeadForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await api("/leads", {
+          method: "POST",
+          body: JSON.stringify({
+            childName: document.getElementById("nl_child").value,
+            interestedGrade: document.getElementById("nl_grade").value,
+            guardianName: document.getElementById("nl_guardian").value,
+            phone: document.getElementById("nl_phone").value,
+            email: document.getElementById("nl_email").value,
+            source: document.getElementById("nl_source").value,
+          }),
+        });
+        toast("Enquiry added to pipeline");
+        closeModal();
+        loadBoard();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    });
+  }
+
+  async function saveLeadUpdates() {
+    try {
+      await api(`/leads/${currentLeadId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          stage: document.getElementById("stageSelect").value,
+          nextFollowUp: document.getElementById("followupDate").value || null,
+        }),
+      });
+      toast("Lead updated");
+      closeModal();
+      loadBoard();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  async function addActivity() {
+    const text = document.getElementById("newNote").value.trim();
+    if (!text) return;
+    try {
+      await api(`/leads/${currentLeadId}/activity`, {
+        method: "POST",
+        body: JSON.stringify({ type: "note", text }),
+      });
+      toast("Note added");
+      openLead(currentLeadId);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  function closeModal() { document.getElementById("modalBackdrop").classList.remove("show"); }
+
+  loadBoard().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>

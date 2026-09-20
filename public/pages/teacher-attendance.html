@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Take Attendance — Teacher</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Teacher portal</div>
+        <h1>Take attendance</h1>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:10px;">
+        <div class="field mb-0"><label>Class</label><select id="classSelect"></select></div>
+        <div class="field mb-0"><label>Date</label><input type="date" id="dateInput" /></div>
+      </div>
+      <table>
+        <thead><tr><th>Roll</th><th>Student</th><th>Status</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <button class="btn" style="margin-top:14px;" onclick="submitAttendance()">Save attendance</button>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["teacher"]);
+  renderSidebar("attendance");
+
+  document.getElementById("dateInput").value = new Date().toISOString().slice(0, 10);
+
+  async function loadClasses() {
+    const d = await api("/dashboard/teacher");
+    const classes = d.teacher ? d.teacher.assignedClasses : [];
+    document.getElementById("classSelect").innerHTML = classes
+      .map((c) => `<option value="${c._id}">${c.name}-${c.section}</option>`)
+      .join("");
+    if (classes.length) loadStudents(classes[0]._id);
+  }
+
+  async function loadStudents(classId) {
+    const students = await api(`/students?classId=${classId}`);
+    document.getElementById("rows").innerHTML = students
+      .map(
+        (s) => `<tr data-student="${s._id}">
+          <td>${s.rollNo || "-"}</td>
+          <td>${s.name}</td>
+          <td>
+            <select class="statusSelect" style="width:140px;">
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+              <option value="late">Late</option>
+              <option value="excused">Excused</option>
+            </select>
+          </td>
+        </tr>`
+      )
+      .join("") || `<tr><td colspan="3" class="muted">No students in this class</td></tr>`;
+  }
+
+  document.getElementById("classSelect").addEventListener("change", (e) => loadStudents(e.target.value));
+
+  async function submitAttendance() {
+    const classId = document.getElementById("classSelect").value;
+    const date = document.getElementById("dateInput").value;
+    const records = [...document.querySelectorAll("#rows tr[data-student]")].map((tr) => ({
+      student: tr.dataset.student,
+      status: tr.querySelector(".statusSelect").value,
+    }));
+    if (!records.length) return;
+    try {
+      const res = await api("/attendance/mark", {
+        method: "POST",
+        body: JSON.stringify({ schoolClass: classId, date, records }),
+      });
+      toast(res.message);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  loadClasses().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>

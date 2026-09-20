@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Attendance — Student</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Student portal</div>
+        <h1>My attendance</h1>
+      </div>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="panel">
+      <table>
+        <thead><tr><th>Date</th><th>Status</th><th>Remark</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  const user = requireAuth(["student"]);
+  renderSidebar("attendance");
+
+  (async function load() {
+    try {
+      const studentId = user.studentProfile;
+      const d = await api(`/attendance/student/${studentId}`);
+      document.getElementById("statGrid").innerHTML = `
+        <div class="stat-tile"><div class="value">${d.percentage}%</div><div class="label">Overall attendance</div></div>
+        <div class="stat-tile"><div class="value">${d.present}</div><div class="label">Days present</div></div>
+        <div class="stat-tile"><div class="value">${d.total}</div><div class="label">Days marked</div></div>
+      `;
+      document.getElementById("rows").innerHTML = d.records
+        .map((r) => `<tr><td>${fmtDate(r.date)}</td><td><span class="pill ${r.status}">${r.status}</span></td><td>${r.remark || "-"}</td></tr>`)
+        .join("") || `<tr><td colspan="3" class="muted">No records yet</td></tr>`;
+    } catch (err) {
+      toast(err.message, true);
+    }
+  })();
+</script>
+</body>
+</html>

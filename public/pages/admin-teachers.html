@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Teachers — Admin</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Admin portal</div>
+        <h1>Teachers</h1>
+      </div>
+      <button class="btn" onclick="openModal()">+ Add teacher</button>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead><tr><th>Employee ID</th><th>Name</th><th>Specialty</th><th>Assigned classes</th><th>Email</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div id="empty" class="empty-state" style="display:none;">No teachers yet.</div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2 style="margin-bottom:18px;">Add teacher</h2>
+    <form id="teacherForm">
+      <div class="field"><label>Full name</label><input id="f_name" required /></div>
+      <div class="field"><label>Employee ID</label><input id="f_emp" required /></div>
+      <div class="field"><label>Subject specialty</label><input id="f_subject" /></div>
+      <div class="field"><label>Email <span class="muted small-text">(used as their login too)</span></label><input id="f_email" type="email" /></div>
+      <div class="field"><label>Phone</label><input id="f_phone" /></div>
+      <button class="btn" type="submit" style="width:100%; justify-content:center;">Save teacher</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="credsBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeCredsModal()">×</button>
+    <h2 style="margin-bottom:6px;">Account created</h2>
+    <p class="small-text muted" style="margin-bottom:18px;">Copy this now — the password isn't shown again.</p>
+    <div id="credsBody"></div>
+    <button class="btn secondary full" style="margin-top:16px;" onclick="closeCredsModal()">Done</button>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["admin"]);
+  renderSidebar("teachers");
+
+  async function loadTeachers() {
+    const teachers = await api("/teachers");
+    const tbody = document.getElementById("rows");
+    document.getElementById("empty").style.display = teachers.length ? "none" : "block";
+    tbody.innerHTML = teachers
+      .map(
+        (t) => `<tr>
+          <td>${t.employeeId}</td>
+          <td>${t.name}</td>
+          <td>${t.subjectSpecialty || "-"}</td>
+          <td>${(t.assignedClasses || []).map((c) => c.name + "-" + c.section).join(", ") || "-"}</td>
+          <td>${t.email || "-"}</td>
+        </tr>`
+      )
+      .join("");
+  }
+
+  function openModal() { document.getElementById("modalBackdrop").classList.add("show"); }
+  function closeModal() { document.getElementById("modalBackdrop").classList.remove("show"); }
+
+  document.getElementById("teacherForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const res = await api("/teachers", {
+        method: "POST",
+        body: JSON.stringify({
+          name: document.getElementById("f_name").value,
+          employeeId: document.getElementById("f_emp").value,
+          subjectSpecialty: document.getElementById("f_subject").value,
+          email: document.getElementById("f_email").value,
+          phone: document.getElementById("f_phone").value,
+        }),
+      });
+      toast("Teacher added");
+      closeModal();
+      e.target.reset();
+      loadTeachers();
+      showCredentials(res.credentials);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  function showCredentials(credentials) {
+    if (!credentials || (!credentials.teacher && !credentials.accountError)) return;
+    let html = "";
+    if (credentials.teacher) {
+      html += `<div class="panel">
+        <div class="small-text muted" style="margin-bottom:4px;">TEACHER LOGIN</div>
+        <div><strong>Email:</strong> ${credentials.teacher.email}</div>
+        <div><strong>Password:</strong> <code>${credentials.teacher.password}</code></div>
+      </div>`;
+    }
+    if (credentials.accountError) {
+      html += `<div class="small-text" style="color:var(--danger);">${credentials.accountError}</div>`;
+    }
+    document.getElementById("credsBody").innerHTML = html;
+    document.getElementById("credsBackdrop").classList.add("show");
+  }
+  function closeCredsModal() {
+    document.getElementById("credsBackdrop").classList.remove("show");
+  }
+
+  loadTeachers().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>
