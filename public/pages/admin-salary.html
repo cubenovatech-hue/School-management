@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Teacher Salary — Admin</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Admin portal</div>
+        <h1>Teacher salary</h1>
+      </div>
+      <button class="btn" onclick="openCreateModal()">+ Add salary record</button>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Salary records</h2>
+        <div class="field mb-0" style="max-width:200px;">
+          <select id="monthFilter" onchange="loadRecords()">
+            <option value="">All months</option>
+          </select>
+        </div>
+      </div>
+      <table>
+        <thead><tr><th>Teacher</th><th>Month</th><th>Basic</th><th>Allowances</th><th>Deductions</th><th>Net pay</th><th>Status</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<!-- Create record -->
+<div class="modal-backdrop" id="createBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeCreateModal()">×</button>
+    <h2 style="margin-bottom:18px;">Add salary record</h2>
+    <form id="createForm">
+      <div class="field"><label>Teacher</label><select id="c_teacher" required></select></div>
+      <div class="field"><label>Month</label><input id="c_month" type="month" required /></div>
+      <div class="field"><label>Basic pay (₹)</label><input id="c_basic" type="number" required /></div>
+      <div class="field"><label>Allowances (₹)</label><input id="c_allow" type="number" value="0" /></div>
+      <div class="field"><label>Deductions (₹)</label><input id="c_deduct" type="number" value="0" /></div>
+      <div class="field"><label>Note</label><input id="c_note" placeholder="Optional" /></div>
+      <button class="btn full" type="submit">Save record</button>
+    </form>
+  </div>
+</div>
+
+<!-- Pay confirmation (3-step) -->
+<div class="modal-backdrop" id="payBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closePayModal()">×</button>
+    <div id="payStep1">
+      <h2 style="margin-bottom:6px;">Mark as paid</h2>
+      <p class="small-text muted" style="margin-bottom:18px;">Review before confirming — this can't be undone.</p>
+      <div class="panel" style="margin-bottom:16px;"><div id="paySummary"></div></div>
+      <div class="field"><label>Payment method</label>
+        <select id="pay_method">
+          <option value="bank_transfer">Bank transfer</option>
+          <option value="cash">Cash</option>
+          <option value="upi">UPI</option>
+          <option value="cheque">Cheque</option>
+        </select>
+      </div>
+      <div class="panel" style="margin: 14px 0 20px; background:var(--admin-tint); border-color:var(--admin);">
+        <div class="small-text" style="font-weight:600; color:var(--admin); margin-bottom:6px;">Will notify:</div>
+        <div id="payRecipient" class="small-text"></div>
+      </div>
+      <button class="btn full" id="confirmPayBtn" onclick="confirmPay()">Confirm &amp; Notify Teacher</button>
+    </div>
+    <div id="payStep2" style="display:none; text-align:center; padding:10px 0;">
+      <div style="font-size:40px; margin-bottom:10px;">✅</div>
+      <h2 style="margin-bottom:8px;">Marked as paid</h2>
+      <p class="small-text muted" style="margin-bottom:18px;" id="payResultText"></p>
+      <button class="btn full" onclick="closePayModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["admin"]);
+  renderSidebar("salary");
+
+  let teachersCache = [];
+  let currentPayId = null;
+
+  function monthLabel(ym) {
+    if (!ym) return "-";
+    const [y, m] = ym.split("-");
+    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  }
+
+  async function init() {
+    teachersCache = await api("/teachers");
+    document.getElementById("c_teacher").innerHTML = teachersCache.map((t) => `<option value="${t._id}">${t.name}</option>`).join("");
+    await loadRecords();
+  }
+
+  async function loadRecords() {
+    const monthFilter = document.getElementById("monthFilter").value;
+    const records = await api(`/salary${monthFilter ? "?month=" + monthFilter : ""}`);
+
+    const months = [...new Set(records.map((r) => r.month))].sort().reverse();
+    const currentFilterVal = document.getElementById("monthFilter").value;
+    document.getElementById("monthFilter").innerHTML =
+      `<option value="">All months</option>` + months.map((m) => `<option value="${m}" ${m === currentFilterVal ? "selected" : ""}>${monthLabel(m)}</option>`).join("");
+
+    document.getElementById("rows").innerHTML = records
+      .map((r) => {
+        const net = r.basicPay + r.allowances - r.deductions;
+        return `<tr>
+          <td>${r.teacher ? r.teacher.name : "-"}</td>
+          <td>${monthLabel(r.month)}</td>
+          <td>${fmtCurrency(r.basicPay)}</td>
+          <td>${fmtCurrency(r.allowances)}</td>
+          <td>${fmtCurrency(r.deductions)}</td>
+          <td><strong>${fmtCurrency(net)}</strong></td>
+          <td><span class="pill ${r.status === "paid" ? "enrolled" : "new"}">${r.status}</span></td>
+          <td>
+            ${r.status === "pending"
+              ? `<button class="btn small" onclick="openPayModal('${r._id}')">Mark paid</button>`
+              : `<a class="btn small secondary" href="/pages/salary-slip.html?salaryId=${r._id}" target="_blank">View slip</a>`}
+          </td>
+        </tr>`;
+      })
+      .join("");
+
+    const summary = await api("/salary/summary/overview");
+    document.getElementById("statGrid").innerHTML = `
+      <div class="stat-tile"><div class="value">${fmtCurrency(summary.totalPaid)}</div><div class="label">Total paid</div></div>
+      <div class="stat-tile"><div class="value" style="color:var(--danger)">${fmtCurrency(summary.totalPending)}</div><div class="label">Pending payout</div></div>
+      <div class="stat-tile"><div class="value">${summary.pendingCount}</div><div class="label">Records awaiting payment</div></div>
+    `;
+  }
+
+  /* ---------------- Create record ---------------- */
+  function openCreateModal() { document.getElementById("createBackdrop").classList.add("show"); }
+  function closeCreateModal() { document.getElementById("createBackdrop").classList.remove("show"); }
+
+  document.getElementById("createForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await api("/salary", {
+        method: "POST",
+        body: JSON.stringify({
+          teacher: document.getElementById("c_teacher").value,
+          month: document.getElementById("c_month").value,
+          basicPay: Number(document.getElementById("c_basic").value) || 0,
+          allowances: Number(document.getElementById("c_allow").value) || 0,
+          deductions: Number(document.getElementById("c_deduct").value) || 0,
+          note: document.getElementById("c_note").value,
+        }),
+      });
+      toast("Salary record saved");
+      closeCreateModal();
+      e.target.reset();
+      loadRecords();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  /* ---------------- Mark as paid (confirm flow) ---------------- */
+  async function openPayModal(id) {
+    currentPayId = id;
+    const records = await api("/salary");
+    const r = records.find((x) => x._id === id);
+    const net = r.basicPay + r.allowances - r.deductions;
+
+    document.getElementById("paySummary").innerHTML = `
+      <div class="flex-between" style="padding:4px 0;"><span class="muted">Teacher</span><strong>${r.teacher.name}</strong></div>
+      <div class="flex-between" style="padding:4px 0;"><span class="muted">Month</span><strong>${monthLabel(r.month)}</strong></div>
+      <div class="flex-between" style="padding:4px 0;"><span class="muted">Net pay</span><strong>${fmtCurrency(net)}</strong></div>
+    `;
+
+    try {
+      const preview = await api(`/salary/teacher/${r.teacher._id}/notify-preview`);
+      document.getElementById("payRecipient").textContent = preview.recipient
+        ? `👨‍🏫 ${preview.recipient.email}`
+        : "No linked login account — teacher won't get an in-app notification, but the slip is still saved and printable.";
+    } catch {
+      document.getElementById("payRecipient").textContent = "Couldn't preview recipient — you can still confirm.";
+    }
+
+    document.getElementById("payStep1").style.display = "block";
+    document.getElementById("payStep2").style.display = "none";
+    document.getElementById("payBackdrop").classList.add("show");
+  }
+  function closePayModal() { document.getElementById("payBackdrop").classList.remove("show"); }
+
+  async function confirmPay() {
+    const btn = document.getElementById("confirmPayBtn");
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+    try {
+      const res = await api(`/salary/${currentPayId}/pay`, {
+        method: "PUT",
+        body: JSON.stringify({ method: document.getElementById("pay_method").value }),
+      });
+      document.getElementById("payResultText").textContent = res.notified
+        ? `Notified: ${res.notified.email}`
+        : `No linked account to notify — the slip is saved and printable.`;
+      document.getElementById("payStep1").style.display = "none";
+      document.getElementById("payStep2").style.display = "block";
+      loadRecords();
+    } catch (err) {
+      toast(err.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Confirm & Notify Teacher";
+    }
+  }
+
+  init().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>

@@ -22,33 +22,83 @@
     <div class="panel">
       <div class="panel-head"><h2>All students</h2></div>
       <table>
-        <thead><tr><th>Student</th><th>Total due</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
+        <thead><tr><th>Student</th><th>Tuition</th><th>Lab</th><th>Transport</th><th>Total due</th><th>Paid</th><th>Balance</th><th></th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
   </main>
 </div>
 
+<!-- Edit fee categories -->
+<div class="modal-backdrop" id="categoriesBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeCategoriesModal()">×</button>
+    <h2 id="categoriesTitle" style="margin-bottom:18px;">Edit fee categories</h2>
+    <form id="categoriesForm">
+      <input type="hidden" id="cat_student" />
+      <div class="field"><label>Tuition Fee (₹)</label><input id="cat_tuition" type="number" value="0" /></div>
+      <div class="field"><label>Lab Fee (₹)</label><input id="cat_lab" type="number" value="0" /></div>
+      <div class="field"><label>Transport Fee (₹) <span class="muted small-text">— e.g. van/bus</span></label><input id="cat_transport" type="number" value="0" /></div>
+      <button class="btn full" type="submit">Save categories</button>
+    </form>
+  </div>
+</div>
+
+<!-- Record payment -->
 <div class="modal-backdrop" id="modalBackdrop">
   <div class="modal">
     <button class="modal-close" onclick="closeModal()">×</button>
-    <h2 id="modalTitle" style="margin-bottom:18px;">Record payment</h2>
-    <form id="payForm">
-      <input type="hidden" id="f_student" />
-      <div class="field"><label>Amount (₹)</label><input id="f_amount" type="number" required /></div>
-      <div class="field">
-        <label>Method</label>
-        <select id="f_method">
-          <option value="cash">Cash</option>
-          <option value="upi">UPI</option>
-          <option value="card">Card</option>
-          <option value="bank_transfer">Bank transfer</option>
-          <option value="cheque">Cheque</option>
-        </select>
+    <div id="payStep1">
+      <h2 id="modalTitle" style="margin-bottom:18px;">Record payment</h2>
+      <form id="payForm">
+        <input type="hidden" id="f_student" />
+        <div class="field"><label>Amount (₹)</label><input id="f_amount" type="number" required /></div>
+        <div class="field">
+          <label>Method</label>
+          <select id="f_method">
+            <option value="cash">Cash</option>
+            <option value="upi">UPI</option>
+            <option value="card">Card</option>
+            <option value="bank_transfer">Bank transfer</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </div>
+        <div class="field"><label>Note</label><input id="f_note" placeholder="Optional" /></div>
+        <button class="btn full" type="submit">Review payment</button>
+      </form>
+    </div>
+
+    <div id="payStep2" style="display:none;">
+      <h2 style="margin-bottom:6px;">Confirm payment</h2>
+      <p class="small-text muted" style="margin-bottom:18px;">Double-check before this is recorded — it can't be edited afterward.</p>
+      <div class="panel" style="margin-bottom:16px;">
+        <div id="reviewSummary"></div>
       </div>
-      <div class="field"><label>Note</label><input id="f_note" placeholder="Optional" /></div>
-      <button class="btn" type="submit" style="width:100%; justify-content:center;">Record payment</button>
-    </form>
+      <div class="panel" style="margin-bottom:20px; background:var(--admin-tint); border-color:var(--admin);">
+        <div class="small-text" style="font-weight:600; color:var(--admin); margin-bottom:6px;">Will notify:</div>
+        <div id="reviewRecipients" class="small-text"></div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn ghost" style="flex:1;" onclick="backToStep1()">← Back</button>
+        <button class="btn" style="flex:2;" id="confirmPayBtn" onclick="confirmPayment()">Confirm &amp; Send Receipt</button>
+      </div>
+    </div>
+
+    <div id="payStep3" style="display:none; text-align:center; padding: 10px 0;">
+      <div style="font-size:40px; margin-bottom:10px;">✅</div>
+      <h2 style="margin-bottom:8px;">Payment recorded</h2>
+      <p class="small-text muted" style="margin-bottom:18px;" id="confirmResultText"></p>
+      <button class="btn full" onclick="closeModal()">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment history / receipts -->
+<div class="modal-backdrop" id="receiptsBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeReceiptsModal()">×</button>
+    <h2 id="receiptsTitle" style="margin-bottom:14px;">Payment history</h2>
+    <div id="receiptsList"></div>
   </div>
 </div>
 
@@ -57,18 +107,36 @@
   requireAuth(["admin"]);
   renderSidebar("fees");
 
+  let feesCache = [];
+
+  function componentAmount(fee, type) {
+    const c = (fee.components || []).find((x) => x.type === type);
+    return c ? c.amount : 0;
+  }
+
   async function loadFees() {
-    const fees = await api("/fees");
-    document.getElementById("rows").innerHTML = fees
+    feesCache = await api("/fees");
+    document.getElementById("rows").innerHTML = feesCache
       .map((f) => {
+        const tuition = componentAmount(f, "tuition");
+        const lab = componentAmount(f, "lab");
+        const transport = componentAmount(f, "transport");
+        const totalDue = f.components.reduce((s, c) => s + c.amount, 0);
         const paid = f.payments.reduce((s, p) => s + p.amount, 0);
-        const balance = f.totalDue - paid;
+        const balance = totalDue - paid;
         return `<tr>
           <td>${f.student ? f.student.name : "-"}</td>
-          <td>${fmtCurrency(f.totalDue)}</td>
+          <td>${fmtCurrency(tuition)}</td>
+          <td>${fmtCurrency(lab)}</td>
+          <td>${fmtCurrency(transport)}</td>
+          <td>${fmtCurrency(totalDue)}</td>
           <td>${fmtCurrency(paid)}</td>
           <td style="color:${balance > 0 ? "var(--danger)" : "var(--ok)"}; font-weight:600;">${fmtCurrency(balance)}</td>
-          <td><button class="btn small secondary" onclick="openModal('${f.student._id}', '${f.student.name}')">Record payment</button></td>
+          <td style="white-space:nowrap;">
+            <button class="btn small ghost" onclick="openCategoriesModal('${f.student._id}', '${f.student.name}')">Edit fees</button>
+            <button class="btn small secondary" onclick="openModal('${f.student._id}', '${f.student.name}')">Payment</button>
+            <button class="btn small ghost" onclick="openReceipts('${f.student._id}', '${f.student.name}')">History</button>
+          </td>
         </tr>`;
       })
       .join("");
@@ -81,18 +149,92 @@
     `;
   }
 
+  /* ---------------- Edit fee categories ---------------- */
+  function openCategoriesModal(studentId, name) {
+    const fee = feesCache.find((f) => f.student._id === studentId);
+    document.getElementById("cat_student").value = studentId;
+    document.getElementById("categoriesTitle").textContent = `Edit fee categories — ${name}`;
+    document.getElementById("cat_tuition").value = componentAmount(fee, "tuition");
+    document.getElementById("cat_lab").value = componentAmount(fee, "lab");
+    document.getElementById("cat_transport").value = componentAmount(fee, "transport");
+    document.getElementById("categoriesBackdrop").classList.add("show");
+  }
+  function closeCategoriesModal() { document.getElementById("categoriesBackdrop").classList.remove("show"); }
+
+  document.getElementById("categoriesForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const studentId = document.getElementById("cat_student").value;
+    const components = [
+      { type: "tuition", label: "Tuition Fee", amount: Number(document.getElementById("cat_tuition").value) || 0 },
+      { type: "lab", label: "Lab Fee", amount: Number(document.getElementById("cat_lab").value) || 0 },
+      { type: "transport", label: "Transport Fee", amount: Number(document.getElementById("cat_transport").value) || 0 },
+    ].filter((c) => c.amount > 0);
+    try {
+      await api(`/fees/student/${studentId}/components`, {
+        method: "PUT",
+        body: JSON.stringify({ components }),
+      });
+      toast("Fee categories updated");
+      closeCategoriesModal();
+      loadFees();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  /* ---------------- Record payment (3-step: fill → review → confirm) ---------------- */
+  let currentStudentName = "";
+
   function openModal(studentId, name) {
     document.getElementById("f_student").value = studentId;
+    currentStudentName = name;
     document.getElementById("modalTitle").textContent = `Record payment — ${name}`;
+    document.getElementById("payStep1").style.display = "block";
+    document.getElementById("payStep2").style.display = "none";
+    document.getElementById("payStep3").style.display = "none";
+    document.getElementById("payForm").reset();
     document.getElementById("modalBackdrop").classList.add("show");
   }
   function closeModal() { document.getElementById("modalBackdrop").classList.remove("show"); }
+  function backToStep1() {
+    document.getElementById("payStep1").style.display = "block";
+    document.getElementById("payStep2").style.display = "none";
+  }
 
   document.getElementById("payForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const studentId = document.getElementById("f_student").value;
+    const amount = Number(document.getElementById("f_amount").value);
+    const method = document.getElementById("f_method").value;
+    const note = document.getElementById("f_note").value;
+
+    document.getElementById("reviewSummary").innerHTML = `
+      <div class="flex-between" style="padding:4px 0;"><span class="muted">Student</span><strong>${currentStudentName}</strong></div>
+      <div class="flex-between" style="padding:4px 0;"><span class="muted">Amount</span><strong>${fmtCurrency(amount)}</strong></div>
+      <div class="flex-between" style="padding:4px 0;"><span class="muted">Method</span><strong>${method.replace("_", " ")}</strong></div>
+      ${note ? `<div class="flex-between" style="padding:4px 0;"><span class="muted">Note</span><strong>${note}</strong></div>` : ""}
+    `;
+
+    try {
+      const preview = await api(`/fees/student/${studentId}/notify-preview`);
+      document.getElementById("reviewRecipients").innerHTML = preview.recipients.length
+        ? preview.recipients.map((r) => `${r.role === "student" ? "🎓" : "👪"} ${r.email} (${r.role})`).join("<br/>")
+        : "No linked login accounts — nobody will be notified in-app. (Record the payment anyway; you can still print the receipt.)";
+    } catch {
+      document.getElementById("reviewRecipients").textContent = "Couldn't preview recipients — you can still confirm.";
+    }
+
+    document.getElementById("payStep1").style.display = "none";
+    document.getElementById("payStep2").style.display = "block";
+  });
+
+  async function confirmPayment() {
+    const btn = document.getElementById("confirmPayBtn");
+    btn.disabled = true;
+    btn.textContent = "Sending…";
     try {
       const studentId = document.getElementById("f_student").value;
-      await api(`/fees/student/${studentId}/payment`, {
+      const res = await api(`/fees/student/${studentId}/payment`, {
         method: "POST",
         body: JSON.stringify({
           amount: Number(document.getElementById("f_amount").value),
@@ -100,14 +242,43 @@
           note: document.getElementById("f_note").value,
         }),
       });
-      toast("Payment recorded");
-      closeModal();
-      e.target.reset();
+
+      const notified = res.notifiedRecipients || [];
+      document.getElementById("confirmResultText").innerHTML = notified.length
+        ? `Notified: ${notified.map((r) => r.email).join(", ")}`
+        : `No linked accounts to notify — the receipt is still saved and printable from History.`;
+
+      document.getElementById("payStep2").style.display = "none";
+      document.getElementById("payStep3").style.display = "block";
       loadFees();
     } catch (err) {
       toast(err.message, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Confirm & Send Receipt";
     }
-  });
+  }
+
+  /* ---------------- Payment history / receipts ---------------- */
+  function openReceipts(studentId, name) {
+    const fee = feesCache.find((f) => f.student._id === studentId);
+    document.getElementById("receiptsTitle").textContent = `Payment history — ${name}`;
+    const payments = [...fee.payments].sort((a, b) => new Date(b.date) - new Date(a.date));
+    document.getElementById("receiptsList").innerHTML =
+      payments
+        .map(
+          (p) => `<div class="flex-between" style="padding:10px 0; border-bottom:1px solid var(--line);">
+            <div>
+              <strong>${fmtCurrency(p.amount)}</strong>
+              <div class="small-text muted">${p.method} · ${fmtDate(p.date)}${p.note ? " · " + p.note : ""}</div>
+            </div>
+            <a class="btn small secondary" href="/pages/receipt.html?studentId=${studentId}&paymentId=${p._id}" target="_blank">Print receipt</a>
+          </div>`
+        )
+        .join("") || `<div class="empty-state">No payments recorded yet.</div>`;
+    document.getElementById("receiptsBackdrop").classList.add("show");
+  }
+  function closeReceiptsModal() { document.getElementById("receiptsBackdrop").classList.remove("show"); }
 
   loadFees().catch((err) => toast(err.message, true));
 </script>

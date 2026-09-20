@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Notifications</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Notifications</div>
+        <h1>Your updates</h1>
+      </div>
+    </div>
+
+    <div id="list"></div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["student", "parent", "teacher", "admin"]);
+  renderSidebar("notifications");
+
+  async function loadInbox() {
+    const messages = await api("/misc/messages/inbox");
+    document.getElementById("list").innerHTML =
+      messages
+        .map(
+          (m) => `<div class="panel" style="${m.read ? "" : "border-left:4px solid var(--admin);"}" id="msg-${m._id}">
+            <div class="flex-between" style="margin-bottom:8px;">
+              <div class="small-text muted">
+                ${m.type === "fee_receipt" ? "💳 Fee payment" : m.type === "salary_slip" ? "💵 Salary paid" : "From " + (m.from ? m.from.name : "School")}
+                ${!m.read ? '<span class="pill new" style="margin-left:8px;">New</span>' : ""}
+              </div>
+              <span class="small-text muted">${fmtDate(m.createdAt)}</span>
+            </div>
+            <p style="font-size:14px; line-height:1.6; margin-bottom:${m.link ? "14px" : "0"};">${m.body}</p>
+            ${m.link ? `<a class="btn small" href="${m.link}" target="_blank" onclick="markRead('${m._id}')">View receipt</a>` : ""}
+            ${!m.read && !m.link ? `<button class="btn small ghost" onclick="markRead('${m._id}')">Mark as read</button>` : ""}
+          </div>`
+        )
+        .join("") || `<div class="empty-state">No notifications yet.</div>`;
+  }
+
+  async function markRead(id) {
+    try {
+      await api(`/misc/messages/${id}/read`, { method: "PUT" });
+      const el = document.getElementById(`msg-${id}`);
+      if (el) el.style.borderLeft = "";
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  loadInbox().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>

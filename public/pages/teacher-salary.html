@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Salary — Teacher</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Teacher portal</div>
+        <h1>My salary</h1>
+      </div>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead><tr><th>Month</th><th>Basic</th><th>Allowances</th><th>Deductions</th><th>Net pay</th><th>Status</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div id="empty" class="empty-state" style="display:none;">No salary records yet.</div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["teacher"]);
+  renderSidebar("salary");
+
+  function monthLabel(ym) {
+    const [y, m] = ym.split("-");
+    return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  }
+
+  (async function load() {
+    try {
+      const d = await api("/dashboard/teacher");
+      if (!d.teacher) {
+        document.getElementById("empty").style.display = "block";
+        return;
+      }
+      const records = await api(`/salary/teacher/${d.teacher._id}`);
+      if (!records.length) {
+        document.getElementById("empty").style.display = "block";
+        return;
+      }
+      document.getElementById("rows").innerHTML = records
+        .map((r) => {
+          const net = r.basicPay + r.allowances - r.deductions;
+          return `<tr>
+            <td>${monthLabel(r.month)}</td>
+            <td>${fmtCurrency(r.basicPay)}</td>
+            <td>${fmtCurrency(r.allowances)}</td>
+            <td>${fmtCurrency(r.deductions)}</td>
+            <td><strong>${fmtCurrency(net)}</strong></td>
+            <td><span class="pill ${r.status === "paid" ? "enrolled" : "new"}">${r.status}</span></td>
+            <td>${r.status === "paid" ? `<a class="btn small secondary" href="/pages/salary-slip.html?salaryId=${r._id}" target="_blank">View slip</a>` : "-"}</td>
+          </tr>`;
+        })
+        .join("");
+    } catch (err) {
+      toast(err.message, true);
+    }
+  })();
+</script>
+</body>
+</html>

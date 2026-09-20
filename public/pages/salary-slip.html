@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Salary Slip</title>
+<link rel="stylesheet" href="/css/style.css" />
+<style>
+  body { background: #E9E5D8; }
+  .receipt-wrap { max-width: 640px; margin: 40px auto; padding: 0 20px; }
+  .receipt {
+    background: #fff; border: 1px solid var(--line); border-radius: 6px;
+    padding: 40px 44px; box-shadow: 0 1px 0 rgba(27,36,48,0.06);
+  }
+  .r-head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 2px solid var(--ink); padding-bottom: 18px; margin-bottom: 24px; }
+  .r-head .brand-mark { width:38px; height:38px; border-radius:50%; background:var(--teacher); color:#fff; display:flex; align-items:center; justify-content:center; font-family:'Fraunces', serif; font-weight:700; }
+  .r-head .school { display:flex; gap:10px; align-items:center; font-family:'Fraunces', serif; font-size:20px; font-weight:600; }
+  .r-head .receipt-no { text-align:right; font-size:12.5px; color:var(--ink-soft); }
+  .r-meta { display:grid; grid-template-columns: 1fr 1fr; gap: 6px 20px; font-size:13.5px; margin-bottom: 26px; }
+  .r-meta .label { color: var(--ink-soft); font-size:11.5px; text-transform:uppercase; letter-spacing:0.03em; }
+  table.r-table { width:100%; border-collapse:collapse; margin-bottom: 22px; }
+  table.r-table th { text-align:left; font-size:11px; text-transform:uppercase; color:var(--ink-soft); border-bottom:1px solid var(--line); padding:6px 4px; }
+  table.r-table td { padding: 8px 4px; border-bottom:1px solid var(--line); font-size:14px; }
+  .r-total-row td { font-weight:700; border-top: 2px solid var(--ink); border-bottom:none; padding-top:12px; }
+  .r-amount-box { background: var(--teacher-tint); border-radius: 6px; padding: 16px 20px; display:flex; justify-content:space-between; align-items:center; margin-bottom: 22px; }
+  .r-amount-box .paid-label { font-size:12.5px; color: var(--teacher); font-weight:600; text-transform:uppercase; }
+  .r-amount-box .paid-amount { font-family:'Fraunces', serif; font-size:26px; font-weight:700; color: var(--teacher); }
+  .r-footer { margin-top: 30px; padding-top: 16px; border-top: 1px dashed var(--line); font-size:12px; color: var(--ink-soft); text-align:center; }
+  .print-bar { max-width: 640px; margin: 0 auto 16px; padding: 0 20px; display:flex; justify-content:flex-end; gap:10px; }
+  @media print {
+    body { background: #fff; }
+    .print-bar { display: none; }
+    .receipt-wrap { margin: 0; padding: 0; max-width: none; }
+    .receipt { border: none; box-shadow: none; padding: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="print-bar">
+  <button class="btn secondary" onclick="window.close()">Close</button>
+  <button class="btn" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<div class="receipt-wrap">
+  <div class="receipt" id="slipBody">
+    <div class="empty-state">Loading slip…</div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["admin", "teacher"]);
+
+  const params = new URLSearchParams(window.location.search);
+  const salaryId = params.get("salaryId");
+
+  (async function load() {
+    try {
+      const data = await api(`/salary/${salaryId}/slip`);
+      const r = data.record;
+      const t = r.teacher;
+      const net = r.basicPay + r.allowances - r.deductions;
+
+      document.getElementById("slipBody").innerHTML = `
+        <div class="r-head">
+          <div class="school"><span class="brand-mark">N</span> Northfield School</div>
+          <div class="receipt-no">Slip No.<br /><strong>${r._id.slice(-8).toUpperCase()}</strong></div>
+        </div>
+
+        <div class="r-meta">
+          <div><div class="label">Teacher</div>${t.name}</div>
+          <div><div class="label">Employee ID</div>${t.employeeId}</div>
+          <div><div class="label">Month</div>${data.monthLabel}</div>
+          <div><div class="label">Paid on</div>${r.paidDate ? fmtDate(r.paidDate) : "—"}</div>
+          <div><div class="label">Method</div>${(r.method || "-").replace("_", " ")}</div>
+          <div><div class="label">Note</div>${r.note || "—"}</div>
+        </div>
+
+        <table class="r-table">
+          <thead><tr><th>Component</th><th style="text-align:right;">Amount</th></tr></thead>
+          <tbody>
+            <tr><td>Basic pay</td><td style="text-align:right;">${fmtCurrency(r.basicPay)}</td></tr>
+            <tr><td>Allowances</td><td style="text-align:right;">+ ${fmtCurrency(r.allowances)}</td></tr>
+            <tr><td>Deductions</td><td style="text-align:right;">− ${fmtCurrency(r.deductions)}</td></tr>
+            <tr class="r-total-row"><td>Net pay</td><td style="text-align:right;">${fmtCurrency(net)}</td></tr>
+          </tbody>
+        </table>
+
+        <div class="r-amount-box">
+          <div><div class="paid-label">Net pay credited</div></div>
+          <div class="paid-amount">${fmtCurrency(net)}</div>
+        </div>
+
+        <div class="r-footer">
+          This is a computer-generated salary slip from Northfield School's management system.<br />
+          For questions about this payment, please contact the school office.
+        </div>
+      `;
+    } catch (err) {
+      document.getElementById("slipBody").innerHTML = `<div class="empty-state">Couldn't load this slip: ${err.message}</div>`;
+    }
+  })();
+</script>
+</body>
+</html>
