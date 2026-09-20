@@ -463,8 +463,71 @@ tr:hover td { background: rgba(27,36,48,0.015); }
 .mt-0 { margin-top: 0; }
 .mb-0 { margin-bottom: 0; }
 
+/* ---------------- Mobile topbar + off-canvas sidebar drawer ---------------- */
+.mobile-topbar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--ink);
+  color: #fff;
+  padding: 13px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 45;
+}
+.mobile-topbar .brand {
+  display: flex; align-items: center; gap: 8px;
+  font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px;
+}
+.mobile-topbar .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.mobile-topbar .hamburger-btn {
+  background: none; border: none; padding: 6px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.mobile-topbar .hamburger-btn span { width: 20px; height: 2px; background: #fff; display: block; border-radius: 1px; }
+
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(27,36,48,0.45);
+  z-index: 55;
+}
+.sidebar-overlay.show { display: block; }
+
 @media (max-width: 860px) {
   .app-shell { grid-template-columns: 1fr; }
-  .sidebar { display: none; }
-  .kanban { grid-template-columns: repeat(6, 260px); }
+  .mobile-topbar { display: flex; }
+
+  .sidebar {
+    position: fixed;
+    top: 0; bottom: 0; left: 0;
+    width: 260px;
+    max-width: 80vw;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 60;
+    box-shadow: 20px 0 40px rgba(27,36,48,0.2);
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  .main { padding: 20px 16px 48px; }
+  .topbar { flex-direction: column; align-items: stretch; gap: 12px; }
+  h1 { font-size: 22px; }
+
+  .kanban { grid-template-columns: repeat(6, 230px); }
+
+  /* Tables scroll horizontally inside their panel instead of squeezing unreadably */
+  .panel { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { min-width: 560px; }
+
+  .modal { padding: 20px; max-width: 92vw; }
+  .modal.wide { max-width: 92vw; }
+
+  .id-card { width: 100%; max-width: 380px; }
+
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 420px) {
+  .stat-grid { grid-template-columns: 1fr; }
 }
