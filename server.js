@@ -29,6 +29,7 @@ app.use("/api/misc", require("./routes/misc"));
 app.use("/api/dashboard", require("./routes/dashboard"));
 app.use("/api/contact", require("./routes/contact"));
 app.use("/api/subscriptions", require("./routes/subscriptions"));
+app.use("/api/salary", require("./routes/salary"));
 
 app.get("/api/health", (req, res) => res.json({ status: "ok", time: new Date() }));
 
