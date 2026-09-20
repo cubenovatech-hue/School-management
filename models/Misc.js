@@ -39,6 +39,8 @@ const messageSchema = new mongoose.Schema(
     to: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     body: { type: String, required: true },
     read: { type: Boolean, default: false },
+    type: { type: String, enum: ["general", "fee_receipt", "salary_slip"], default: "general" },
+    link: { type: String }, // optional deep link, e.g. a receipt page
   },
   { timestamps: true }
 );
