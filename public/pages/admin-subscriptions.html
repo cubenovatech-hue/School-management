@@ -36,7 +36,7 @@
     <div class="panel">
       <div class="panel-head"><h2>All requests</h2></div>
       <table>
-        <thead><tr><th>School</th><th>Contact</th><th>Plan</th><th>Status</th><th>Requested</th></tr></thead>
+        <thead><tr><th>School</th><th>Contact</th><th>Plan</th><th>Status</th><th>Trial ends</th><th>Requested</th></tr></thead>
         <tbody id="allRows"></tbody>
       </table>
     </div>
@@ -82,22 +82,28 @@
         .join("") || `<div class="empty-state">No pending requests — you're all caught up.</div>`;
 
     document.getElementById("allRows").innerHTML = all
-      .map(
-        (r) => `<tr>
+      .map((r) => {
+        let trialCell = "-";
+        if (r.trialEndsAt) {
+          const isExpired = new Date(r.trialEndsAt) < new Date();
+          trialCell = `<span class="pill ${isExpired ? "absent" : "present"}">${isExpired ? "Expired" : fmtDate(r.trialEndsAt)}</span>`;
+        }
+        return `<tr>
           <td>${r.schoolName}</td>
           <td>${r.name}<div class="small-text muted">${r.email}</div></td>
           <td><span class="plan-tag ${r.planType}">${planLabel[r.planType]}</span></td>
           <td><span class="pill ${r.status === "approved" ? "enrolled" : r.status === "rejected" ? "lost" : "new"}">${r.status}</span></td>
+          <td>${trialCell}</td>
           <td>${fmtDate(r.createdAt)}</td>
-        </tr>`
-      )
+        </tr>`;
+      })
       .join("");
   }
 
   async function approve(id) {
     try {
-      await api(`/subscriptions/${id}/approve`, { method: "PUT" });
-      toast("Access granted");
+      const res = await api(`/subscriptions/${id}/approve`, { method: "PUT" });
+      toast(res.emailSent ? "Access granted — email sent" : "Access granted (email not sent — check SMTP config)");
       load();
     } catch (err) {
       toast(err.message, true);
