@@ -578,19 +578,33 @@ footer .links { display: flex; gap: 20px; font-size: 13.5px; }
 <div class="modal-backdrop" id="subBackdrop" onclick="if(event.target===this) closeSubModal()">
   <div class="modal">
     <button class="modal-close" onclick="closeSubModal()">×</button>
-    <h2 id="subModalTitle" style="margin-bottom:4px;">Request access</h2>
-    <p style="color:var(--ink-soft); font-size:13.5px; margin-bottom:22px;" id="subModalSub">Tell us about your school and we'll set you up.</p>
-    <form id="subForm">
-      <input type="hidden" id="subPlanType" />
-      <div class="field"><label>Your name</label><input id="subName" required /></div>
-      <div class="field"><label>Email</label><input id="subEmail" type="email" required /></div>
-      <div class="field"><label>Phone <span class="muted small-text">(optional)</span></label><input id="subPhone" /></div>
-      <div class="field"><label>School name</label><input id="subSchool" required /></div>
-      <button class="btn full crm" type="submit" id="subSubmitBtn">Submit request</button>
-      <div class="confirm-msg" id="subConfirm">Thanks — your request has been sent. Our team will review and grant access soon.</div>
-      <div class="confirm-msg" id="subError" style="background:var(--crm-tint); color:var(--crm);">Something went wrong — please try again.</div>
-    </form>
-    <div class="note">Requests are reviewed by our team and access is granted manually — usually within one business day.</div>
+
+    <div id="subFormWrap">
+      <h2 id="subModalTitle" style="margin-bottom:4px;">Request access</h2>
+      <p style="color:var(--ink-soft); font-size:13.5px; margin-bottom:22px;" id="subModalSub">Tell us about your school and we'll set you up.</p>
+      <form id="subForm">
+        <input type="hidden" id="subPlanType" />
+        <div class="field"><label>Your name</label><input id="subName" required /></div>
+        <div class="field"><label>Email</label><input id="subEmail" type="email" required /></div>
+        <div class="field"><label>Phone <span class="muted small-text">(optional)</span></label><input id="subPhone" /></div>
+        <div class="field"><label>School name</label><input id="subSchool" required /></div>
+        <button class="btn full crm" type="submit" id="subSubmitBtn">Submit request</button>
+        <div class="confirm-msg" id="subError" style="background:var(--crm-tint); color:var(--crm);">Something went wrong — please try again.</div>
+      </form>
+      <div class="note" id="subReviewNote">Requests are reviewed by our team and access is granted manually — usually within one business day.</div>
+    </div>
+
+    <div id="subDemoSuccess" style="display:none; text-align:center; padding: 6px 0;">
+      <div style="font-size:38px; margin-bottom:8px;">🎉</div>
+      <h2 style="margin-bottom:6px;">Your demo is ready</h2>
+      <p style="color:var(--ink-soft); font-size:13.5px; margin-bottom:20px;" id="subTrialText"></p>
+      <div class="form-panel" style="text-align:left; margin-bottom:18px;">
+        <div class="small-text muted" style="margin-bottom:10px;">DEMO LOGINS — EXPLORE EVERY PORTAL</div>
+        <div id="demoAccountsList"></div>
+      </div>
+      <a class="btn full crm" href="/login.html" style="margin-bottom:10px;">Log in now →</a>
+      <div class="note">These are shared demo accounts for exploring the product — please don't enter real student or payment data. Ready for your own private workspace? Choose a plan above any time.</div>
+    </div>
   </div>
 </div>
 
@@ -699,8 +713,11 @@ function openSubModal(planType) {
   const [title, sub] = subTitles[planType] || subTitles.demo;
   document.getElementById('subModalTitle').textContent = title;
   document.getElementById('subModalSub').textContent = sub;
-  document.getElementById('subConfirm').classList.remove('show');
+  document.getElementById('subFormWrap').style.display = 'block';
+  document.getElementById('subDemoSuccess').style.display = 'none';
+  document.getElementById('subReviewNote').style.display = planType === 'demo' ? 'none' : 'block';
   document.getElementById('subError').classList.remove('show');
+  document.getElementById('subForm').reset();
   document.getElementById('subBackdrop').classList.add('show');
 }
 function closeSubModal() {
@@ -711,9 +728,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSubMo
 document.getElementById('subForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = document.getElementById('subSubmitBtn');
-  const confirmEl = document.getElementById('subConfirm');
   const errorEl = document.getElementById('subError');
-  confirmEl.classList.remove('show');
   errorEl.classList.remove('show');
   btn.disabled = true;
   btn.textContent = 'Sending…';
@@ -730,10 +745,27 @@ document.getElementById('subForm').addEventListener('submit', async (e) => {
         schoolName: document.getElementById('subSchool').value,
       }),
     });
-    if (!res.ok) throw new Error();
-    confirmEl.classList.add('show');
-    e.target.reset();
-  } catch {
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Something went wrong');
+
+    if (data.demoCredentials) {
+      // Instant demo — show credentials right away, no waiting on admin
+      document.getElementById('demoAccountsList').innerHTML = data.demoCredentials
+        .map((a) => `<div style="margin-bottom:8px; font-size:13.5px;"><strong>${a.role}:</strong> ${a.email} / ${a.password}</div>`)
+        .join('');
+      const expiry = new Date(data.trialEndsAt);
+      document.getElementById('subTrialText').textContent =
+        `Free access for 7 days, until ${expiry.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}. ` +
+        (data.emailSent ? "We've also emailed these details to you." : "Subscribe any time to keep going after that.");
+      document.getElementById('subFormWrap').style.display = 'none';
+      document.getElementById('subDemoSuccess').style.display = 'block';
+    } else {
+      // Paid plan — still goes to admin for review, as before
+      alert(data.message || 'Request sent — our team will review and grant access soon.');
+      closeSubModal();
+    }
+  } catch (err) {
+    errorEl.textContent = err.message || 'Something went wrong — please try again.';
     errorEl.classList.add('show');
   } finally {
     btn.disabled = false;
