@@ -17,6 +17,7 @@ const subscriptionRequestSchema = new mongoose.Schema(
       default: "pending",
     },
     approvedAt: { type: Date },
+    trialEndsAt: { type: Date }, // set only for auto-approved demo requests
     notes: { type: String },
   },
   { timestamps: true }
