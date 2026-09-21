@@ -26,26 +26,6 @@
       </div>
       <button class="btn" type="submit" style="width:100%; justify-content:center;">Sign in</button>
     </form>
-
-    <div class="demo-accounts">
-      <div style="margin-bottom:6px; font-weight:600; color: var(--ink);">Demo accounts (click to fill)</div>
-      <div class="row" data-email="admin@school.io" data-pass="admin123">
-        <span><span class="tag" style="color:#2F6D5E;">Admin</span> admin@school.io</span>
-        <span>admin123</span>
-      </div>
-      <div class="row" data-email="teacher@school.io" data-pass="teacher123">
-        <span><span class="tag" style="color:#3A5BA0;">Teacher</span> teacher@school.io</span>
-        <span>teacher123</span>
-      </div>
-      <div class="row" data-email="arjun@school.io" data-pass="student123">
-        <span><span class="tag" style="color:#C97A2B;">Student</span> arjun@school.io</span>
-        <span>student123</span>
-      </div>
-      <div class="row" data-email="arjun.parent@mail.com" data-pass="parent123">
-        <span><span class="tag" style="color:#8B4F9E;">Parent</span> arjun.parent@mail.com</span>
-        <span>parent123</span>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -59,13 +39,6 @@
       window.location.href = `/pages/${user.role}.html`;
     }
   })();
-
-  document.querySelectorAll(".demo-accounts .row").forEach((row) => {
-    row.addEventListener("click", () => {
-      document.getElementById("email").value = row.dataset.email;
-      document.getElementById("password").value = row.dataset.pass;
-    });
-  });
 
   document.getElementById("loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
