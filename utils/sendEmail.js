@@ -1,45 +1,51 @@
-const nodemailer = require("nodemailer");
+// utils/sendEmail.js
+//
+// Sends transactional email via Brevo's HTTP API (https://api.brevo.com/v3/smtp/email)
+// instead of SMTP. Render's free tier blocks outbound traffic on SMTP ports
+// (25, 465, 587) as of Sept 26, 2025 — this goes out over normal HTTPS (443),
+// which is never blocked, so it works identically on localhost and on Render free tier.
+//
+// Same function signature as before: sendEmail({ to, subject, html }) -> { sent: boolean }
+// so no other file in the project needs to change.
 
-let transporter = null;
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const FROM_EMAIL = process.env.FROM_EMAIL || "no-reply@northfieldschool.io";
+const FROM_NAME = process.env.FROM_NAME || "Northfield School";
 
-function getTransporter() {
-  if (transporter) return transporter;
-
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env;
-  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-    return null; // not configured — caller should handle this gracefully
-  }
-
-  transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: Number(SMTP_PORT) || 587,
-    secure: Number(SMTP_PORT) === 465, // true for port 465, false for 587/others
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-  });
-  return transporter;
-}
-
-// Sends an email. Never throws — logs and returns { sent: false, reason } on any failure,
-// so a broken/missing email config never breaks the feature that triggered it
-// (e.g. a demo signup should still work even if the email can't be sent).
 async function sendEmail({ to, subject, html }) {
-  const t = getTransporter();
-  if (!t) {
-    console.warn(`[email] SMTP not configured — skipped sending "${subject}" to ${to}`);
-    return { sent: false, reason: "SMTP not configured" };
+  if (!BREVO_API_KEY) {
+    console.error(`[email] BREVO_API_KEY is not set — cannot send "${subject}" to ${to}`);
+    return { sent: false, error: "BREVO_API_KEY missing" };
   }
 
   try {
-    await t.sendMail({
-      from: `"${process.env.FROM_NAME || "Northfield School"}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
-      to,
-      subject,
-      html,
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "api-key": BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: { name: FROM_NAME, email: FROM_EMAIL },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
     });
-    return { sent: true };
+
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
+      console.error(`[email] Failed to send "${subject}" to ${to}: ${response.status} ${errBody}`);
+      return { sent: false, error: `Brevo API error ${response.status}` };
+    }
+
+    const data = await response.json().catch(() => ({}));
+    console.log(`[email] Sent "${subject}" to ${to} (messageId: ${data.messageId || "n/a"})`);
+    return { sent: true, messageId: data.messageId };
   } catch (err) {
-    console.error(`[email] Failed to send "${subject}" to ${to}:`, err.message);
-    return { sent: false, reason: err.message };
+    console.error(`[email] Failed to send "${subject}" to ${to}: ${err.message}`);
+    return { sent: false, error: err.message };
   }
 }
 
