@@ -337,28 +337,22 @@ footer .links { display: flex; gap: 20px; font-size: 13.5px; }
   .split { grid-template-columns: 1fr; gap: 36px; }
   section { padding: 56px 0; }
 }
-
-/* ---------------- Chatbot widget ---------------- */
-.chat-fab {
-  position: fixed; right: 22px; bottom: 22px; z-index: 70;
+/* ---------------- Chat widget ---------------- */
+.chat-bubble {
+  position: fixed; bottom: 22px; right: 22px; z-index: 70;
   width: 58px; height: 58px; border-radius: 50%;
-  background: var(--crm); color: #fff; border: none; cursor: pointer;
-  box-shadow: var(--shadow-lg);
+  background: var(--admin); color: #fff;
   display: flex; align-items: center; justify-content: center;
-  font-size: 24px;
-  transition: transform 0.15s ease;
+  font-size: 24px; border: none; cursor: pointer;
+  box-shadow: 0 10px 30px -8px rgba(27,36,48,0.4);
+  transition: transform 0.2s ease;
 }
-.chat-fab:hover { transform: scale(1.06); }
-.chat-fab .fab-dot {
-  position: absolute; top: 6px; right: 6px;
-  width: 10px; height: 10px; border-radius: 50%;
-  background: #F0B23A; border: 2px solid var(--paper-raised);
-}
+.chat-bubble:hover { transform: scale(1.06); }
 
 .chat-panel {
-  position: fixed; right: 22px; bottom: 92px; z-index: 70;
+  position: fixed; bottom: 92px; right: 22px; z-index: 70;
   width: 340px; max-width: calc(100vw - 44px);
-  height: 460px; max-height: calc(100vh - 140px);
+  height: 460px; max-height: 70vh;
   background: var(--paper-raised);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -369,45 +363,40 @@ footer .links { display: flex; gap: 20px; font-size: 13.5px; }
 }
 .chat-panel.open { display: flex; }
 
-.chat-head {
+.chat-header {
   background: var(--ink); color: #fff;
   padding: 14px 16px;
   display: flex; align-items: center; justify-content: space-between;
 }
-.chat-head .title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15.5px; display: flex; align-items: center; gap: 8px; }
-.chat-head .title .mark { width: 24px; height: 24px; border-radius: 50%; background: var(--admin); display: flex; align-items: center; justify-content: center; font-size: 12px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
-.chat-head .sub { font-size: 11px; color: #B7BAC2; margin-top: 1px; }
-.chat-head button { background: none; border: none; color: #fff; font-size: 18px; cursor: pointer; opacity: 0.8; }
-.chat-head button:hover { opacity: 1; }
+.chat-header .title { font-family: 'Fraunces', serif; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.chat-header .dot2 { width: 8px; height: 8px; border-radius: 50%; background: #4ADE80; }
+.chat-header button { background: none; border: none; color: #C7CAD1; font-size: 18px; cursor: pointer; }
 
-.chat-body {
+.chat-messages {
   flex: 1; overflow-y: auto; padding: 14px;
   display: flex; flex-direction: column; gap: 10px;
-  background: var(--paper);
 }
-.chat-msg { max-width: 84%; font-size: 13.5px; line-height: 1.45; padding: 9px 12px; border-radius: 10px; }
-.chat-msg.bot { align-self: flex-start; background: var(--paper-raised); border: 1px solid var(--line); border-bottom-left-radius: 3px; }
-.chat-msg.user { align-self: flex-end; background: var(--admin); color: #fff; border-bottom-right-radius: 3px; }
-
-.chat-quick { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 12px; background: var(--paper); }
-.chat-quick button {
-  background: var(--paper-raised); border: 1px solid var(--line); color: var(--ink);
-  font-size: 12px; padding: 6px 10px; border-radius: 14px; cursor: pointer;
-}
-.chat-quick button:hover { border-color: var(--admin); color: var(--admin); }
+.chat-msg { max-width: 82%; padding: 9px 12px; border-radius: 10px; font-size: 13.5px; line-height: 1.5; }
+.chat-msg.bot { background: var(--admin-tint); color: var(--ink); align-self: flex-start; border-bottom-left-radius: 3px; }
+.chat-msg.user { background: var(--ink); color: #fff; align-self: flex-end; border-bottom-right-radius: 3px; }
+.chat-msg.typing { color: var(--ink-soft); font-style: italic; }
 
 .chat-input-row {
-  display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); background: var(--paper-raised);
+  display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line);
 }
-.chat-input-row input { flex: 1; padding: 9px 11px; font-size: 13.5px; }
+.chat-input-row input {
+  flex: 1; border: 1px solid var(--line); border-radius: 20px;
+  padding: 9px 14px; font-size: 13.5px; font-family: 'Space Grotesk', sans-serif;
+}
+.chat-input-row input:focus { outline: 2px solid var(--admin); }
 .chat-input-row button {
-  background: var(--crm); color: #fff; border: none; border-radius: 4px;
-  width: 40px; font-size: 15px; cursor: pointer;
+  background: var(--admin); color: #fff; border: none; border-radius: 50%;
+  width: 36px; height: 36px; flex-shrink: 0; cursor: pointer; font-size: 15px;
 }
 
-@media (max-width: 480px) {
-  .chat-panel { right: 12px; left: 12px; width: auto; bottom: 82px; }
-  .chat-fab { right: 16px; bottom: 16px; }
+@media (max-width: 420px) {
+  .chat-panel { right: 12px; bottom: 82px; width: calc(100vw - 24px); }
+  .chat-bubble { right: 12px; bottom: 12px; }
 }
 </style>
 </head>
@@ -647,6 +636,22 @@ footer .links { display: flex; gap: 20px; font-size: 13.5px; }
   </div>
 </footer>
 
+<!-- Chat widget -->
+<button class="chat-bubble" onclick="toggleChat()" aria-label="Chat with us">💬</button>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-header">
+    <div class="title"><span class="dot2"></span> Northfield Assistant</div>
+    <button onclick="toggleChat()">×</button>
+  </div>
+  <div class="chat-messages" id="chatMessages">
+    <div class="chat-msg bot">Hi! Ask me about class timings, office hours, sports day, or life at Northfield.</div>
+  </div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="Type a question…" onkeydown="if(event.key==='Enter') sendChatMessage()" />
+    <button onclick="sendChatMessage()" aria-label="Send">➤</button>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="subBackdrop" onclick="if(event.target===this) closeSubModal()">
   <div class="modal">
     <button class="modal-close" onclick="closeSubModal()">×</button>
@@ -680,26 +685,7 @@ footer .links { display: flex; gap: 20px; font-size: 13.5px; }
   </div>
 </div>
 
-<!-- ================= Chatbot widget (free, rule-based — no API key, no cost) ================= -->
-<button class="chat-fab" id="chatFab" onclick="toggleChat()" aria-label="Open chat">
-  💬<span class="fab-dot" id="chatDot"></span>
-</button>
 
-<div class="chat-panel" id="chatPanel">
-  <div class="chat-head">
-    <div>
-      <div class="title"><span class="mark">N</span> Northfield Assistant</div>
-      <div class="sub">Usually replies instantly</div>
-    </div>
-    <button onclick="toggleChat()" aria-label="Close chat">×</button>
-  </div>
-  <div class="chat-body" id="chatBody"></div>
-  <div class="chat-quick" id="chatQuick"></div>
-  <div class="chat-input-row">
-    <input id="chatInput" type="text" placeholder="Ask about pricing, demo, features…" onkeydown="if(event.key==='Enter') sendChatMessage()" />
-    <button onclick="sendChatMessage()" aria-label="Send">➤</button>
-  </div>
-</div>
 
 <script>
 /* ---------------- Mobile nav ---------------- */
@@ -707,6 +693,8 @@ function toggleMobileNav() {
   const el = document.getElementById('mobileNav');
   el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
 }
+
+/* ---------------- Mobile nav auto-close on outside click ---------------- */
 
 /* ---------------- Scroll reveal ---------------- */
 const revealEls = document.querySelectorAll('.reveal');
@@ -808,12 +796,11 @@ function openSubModal(planType) {
   document.getElementById('subError').classList.remove('show');
   document.getElementById('subForm').reset();
   document.getElementById('subBackdrop').classList.add('show');
-  closeChat();
 }
 function closeSubModal() {
   document.getElementById('subBackdrop').classList.remove('show');
 }
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeSubModal(); closeChat(); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSubModal(); });
 
 document.getElementById('subForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -863,6 +850,58 @@ document.getElementById('subForm').addEventListener('submit', async (e) => {
   }
 });
 
+/* ---------------- Chat widget ---------------- */
+let chatHistory = [];
+let chatOpen = false;
+
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chatPanel').classList.toggle('open', chatOpen);
+  if (chatOpen) document.getElementById('chatInput').focus();
+}
+
+function appendChatMessage(role, text) {
+  const msgEl = document.createElement('div');
+  msgEl.className = `chat-msg ${role === 'user' ? 'user' : 'bot'}`;
+  msgEl.textContent = text;
+  const container = document.getElementById('chatMessages');
+  container.appendChild(msgEl);
+  container.scrollTop = container.scrollHeight;
+  return msgEl;
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chatInput');
+  const message = input.value.trim();
+  if (!message) return;
+
+  appendChatMessage('user', message);
+  input.value = '';
+  input.disabled = true;
+
+  const typingEl = appendChatMessage('bot', 'Typing…');
+  typingEl.classList.add('typing');
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, history: chatHistory }),
+    });
+    const data = await res.json();
+    typingEl.remove();
+    appendChatMessage('bot', data.reply || "Sorry, I couldn't process that.");
+    chatHistory.push({ role: 'user', content: message });
+    chatHistory.push({ role: 'assistant', content: data.reply || '' });
+  } catch {
+    typingEl.remove();
+    appendChatMessage('bot', "Sorry, something went wrong — please try again.");
+  } finally {
+    input.disabled = false;
+    input.focus();
+  }
+}
+
 /* ---------------- Contact form (real submit, no login required) ---------------- */
 document.getElementById('contactForm').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -894,175 +933,6 @@ document.getElementById('contactForm').addEventListener('submit', async (e) => {
     btn.textContent = 'Send message';
   }
 });
-
-/* ================= Chatbot: free, rule-based, client-side only ==================
-   No API key, no server call, no per-message cost. Matches the visitor's message
-   against a small knowledge base (keywords -> answer) built from this page's own
-   pricing / features / CRM / FAQ content, and falls back to pointing them at the
-   contact form or demo button when nothing matches well enough.
-=================================================================================== */
-const CHAT_KB = [
-  {
-    keywords: ['demo', 'trial', 'free', 'try'],
-    answer: "You can start a free 7-day demo with full access — no card required. It instantly gives you login details for all 5 portals (Admin, Teacher, Student, Parent) by email.",
-    action: { label: 'Start free demo', fn: () => openSubModal('demo') },
-  },
-  {
-    keywords: ['price', 'pricing', 'cost', 'plan', 'plans', 'how much', 'fee', 'fees'],
-    answer: "There are 3 paid plans after your free demo: Monthly (₹4,999), 6-Month (₹24,999, most popular), and Annual (₹44,999). All plans include every role portal plus the Admissions CRM.",
-    action: { label: 'See pricing', fn: () => scrollToSection('pricing') },
-  },
-  {
-    keywords: ['login', 'log in', 'sign in', 'password', 'portal'],
-    answer: "Each role — Admin, Teacher, Student, and Parent — logs in from the same login page with their own email and password. If you're on the free demo, your credentials were sent to your email.",
-    action: { label: 'Go to login', fn: () => { window.location.href = '/login.html'; } },
-  },
-  {
-    keywords: ['crm', 'admission', 'admissions', 'enquiry', 'enquiries', 'lead', 'leads', 'pipeline'],
-    answer: "The Admissions CRM tracks every enquiry through 6 stages — New, Contacted, Visit, Applied, Enrolled, or Lost — with a timeline per family and follow-up reminders so nothing goes cold.",
-    action: { label: 'See the CRM', fn: () => scrollToSection('crm') },
-  },
-  {
-    keywords: ['attendance'],
-    answer: "Teachers mark attendance in bulk per class, and the system auto-flags students who drop below an attendance threshold you set — instead of a raw log nobody checks.",
-  },
-  {
-    keywords: ['library', 'book', 'books'],
-    answer: "The Library module handles issue/return and calculates overdue fines automatically, per day.",
-  },
-  {
-    keywords: ['message', 'messaging', 'chat between', 'contact teacher', 'contact parent'],
-    answer: "Messaging lets any two accounts talk directly — for example a teacher and a parent — without needing a phone tree.",
-  },
-  {
-    keywords: ['announcement', 'announcements', 'notice', 'notices'],
-    answer: "Announcements can be posted to everyone, or targeted to just teachers, students, or parents.",
-  },
-  {
-    keywords: ['feature', 'features', 'what can', 'what does', 'include', 'includes'],
-    answer: "Northfield includes: Admissions CRM, a fee ledger with running balances, attendance alerts, a library issue/return system, direct messaging, and targeted announcements — across 5 role-based portals.",
-    action: { label: 'See all features', fn: () => scrollToSection('features') },
-  },
-  {
-    keywords: ['install', 'setup', 'requirement', 'node', 'mongodb', 'self host', 'self-host'],
-    answer: "You need Node.js and a MongoDB database (local or a free Atlas cluster). The app runs with one command once those are configured — it's not a hosted SaaS product.",
-  },
-  {
-    keywords: ['data', 'privacy', 'secure', 'security', 'share'],
-    answer: "Your data isn't shared with anyone — this runs on your own server and your own MongoDB database, with no third-party data sharing built in.",
-  },
-  {
-    keywords: ['support', 'help', 'contact', 'talk to someone', 'human', 'reach'],
-    answer: "You can reach the school office directly through the contact form on this page, or check the FAQ just above it for common questions.",
-    action: { label: 'Open contact form', fn: () => scrollToSection('contact') },
-  },
-  {
-    keywords: ['parent', 'child', 'children', 'multiple kids'],
-    answer: "Yes — a single parent account can be linked to more than one student, and the dashboard shows each child's fees and attendance separately.",
-  },
-  {
-    keywords: ['automation', 'automate', 'automatic', 'automated'],
-    answer: "A few things run automatically without anyone clicking a button: attendance alerts when a student drops below a threshold, overdue library fine calculation, follow-up reminders in the Admissions CRM when they're due, and instant demo emails the moment someone requests one.",
-  },
-  {
-    keywords: ['hi', 'hello', 'hey'],
-    answer: "Hey! I can answer questions about pricing, the free demo, login access, or any feature — what would you like to know?",
-  },
-];
-
-const CHAT_QUICK_REPLIES = ['Pricing', 'Free demo', 'Features', 'Login help'];
-let chatStarted = false;
-
-function toggleChat() {
-  const panel = document.getElementById('chatPanel');
-  const isOpen = panel.classList.toggle('open');
-  if (isOpen && !chatStarted) {
-    chatStarted = true;
-    document.getElementById('chatDot').style.display = 'none';
-    addChatMessage('bot', "Hi, I'm the Northfield assistant 👋 Ask me about pricing, the free demo, features, or logging in.");
-    renderQuickReplies();
-  }
-}
-function closeChat() {
-  document.getElementById('chatPanel').classList.remove('open');
-}
-
-function scrollToSection(id) {
-  closeChat();
-  const el = document.getElementById(id);
-  if (el) el.scrollIntoView({ behavior: 'smooth' });
-}
-
-function addChatMessage(who, text) {
-  const body = document.getElementById('chatBody');
-  const div = document.createElement('div');
-  div.className = 'chat-msg ' + who;
-  div.textContent = text;
-  body.appendChild(div);
-  body.scrollTop = body.scrollHeight;
-  return div;
-}
-
-function addChatAction(label, fn) {
-  const body = document.getElementById('chatBody');
-  const wrap = document.createElement('div');
-  wrap.style.alignSelf = 'flex-start';
-  const btn = document.createElement('button');
-  btn.textContent = label;
-  btn.style.cssText = 'background:var(--admin);color:#fff;border:none;border-radius:14px;padding:7px 14px;font-size:12.5px;cursor:pointer;margin-top:2px;';
-  btn.onclick = fn;
-  wrap.appendChild(btn);
-  body.appendChild(wrap);
-  body.scrollTop = body.scrollHeight;
-}
-
-function renderQuickReplies() {
-  const q = document.getElementById('chatQuick');
-  q.innerHTML = '';
-  CHAT_QUICK_REPLIES.forEach((label) => {
-    const btn = document.createElement('button');
-    btn.textContent = label;
-    btn.onclick = () => { document.getElementById('chatInput').value = label; sendChatMessage(); };
-    q.appendChild(btn);
-  });
-}
-
-function matchChat(message) {
-  const text = message.toLowerCase();
-  let best = null;
-  let bestScore = 0;
-  for (const entry of CHAT_KB) {
-    let score = 0;
-    for (const kw of entry.keywords) {
-      if (text.includes(kw)) score += kw.length; // longer/more specific keyword hits count more
-    }
-    if (score > bestScore) { bestScore = score; best = entry; }
-  }
-  return bestScore > 0 ? best : null;
-}
-
-function sendChatMessage() {
-  const input = document.getElementById('chatInput');
-  const message = input.value.trim();
-  if (!message) return;
-  addChatMessage('user', message);
-  input.value = '';
-
-  setTimeout(() => {
-    const match = matchChat(message);
-    if (match) {
-      addChatMessage('bot', match.answer);
-      if (match.action) addChatAction(match.action.label, match.action.fn);
-    } else {
-      addChatMessage(
-        'bot',
-        "I'm not sure about that one — but you can ask the school office directly, or start a free demo to explore everything yourself."
-      );
-      addChatAction('Open contact form', () => scrollToSection('contact'));
-      addChatAction('Start free demo', () => openSubModal('demo'));
-    }
-  }, 350); // small delay so it reads as a reply, not an instant lookup
-}
 </script>
 
 </body>
