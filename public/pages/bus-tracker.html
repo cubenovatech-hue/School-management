@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bus Tracker</title>
+<link rel="stylesheet" href="/css/style.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  #map { height: 420px; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Bus tracker</div>
+        <h1>Where's the bus?</h1>
+      </div>
+    </div>
+
+    <div id="content"></div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  const user = requireAuth(["student", "parent"]);
+  renderSidebar("bustracker");
+
+  let map, marker, pollTimer;
+
+  async function load() {
+    try {
+      const buses = await api("/bus/mine");
+      if (!buses.length) {
+        document.getElementById("content").innerHTML = `<div class="empty-state">No bus is assigned to your class yet. Contact the school office if you expect one.</div>`;
+        return;
+      }
+
+      const bus = buses[0]; // most students/parents will only have one relevant bus
+      document.getElementById("content").innerHTML = `
+        <div class="panel">
+          <div class="panel-head">
+            <h2>${bus.busNumber} — ${bus.routeName}</h2>
+            <span class="pill ${bus.sharingActive ? "present" : "absent"}" id="statusPill">${bus.sharingActive ? "Live" : "Offline"}</span>
+          </div>
+          <div id="map"></div>
+          <div class="small-text muted" style="margin-top:10px;" id="mapMeta"></div>
+          <div class="small-text muted" style="margin-top:6px;">Driver: ${bus.driverName}${bus.driverPhone ? " · " + bus.driverPhone : ""}</div>
+        </div>
+      `;
+
+      map = L.map("map").setView([20.5937, 78.9629], 5);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+      marker = L.marker([20.5937, 78.9629]).addTo(map);
+
+      async function poll() {
+        try {
+          const fresh = await api(`/bus/${bus._id}/location`);
+          document.getElementById("statusPill").className = `pill ${fresh.sharingActive ? "present" : "absent"}`;
+          document.getElementById("statusPill").textContent = fresh.sharingActive ? "Live" : "Offline";
+          if (fresh.currentLocation && fresh.currentLocation.lat) {
+            const { lat, lng, speedKmh, updatedAt } = fresh.currentLocation;
+            marker.setLatLng([lat, lng]);
+            map.setView([lat, lng], 15);
+            document.getElementById("mapMeta").textContent =
+              `${fresh.sharingActive ? "🟢 Live" : "⚪ Last known"} · ${speedKmh != null ? speedKmh + " km/h · " : ""}Updated ${new Date(updatedAt).toLocaleTimeString()}`;
+          } else {
+            document.getElementById("mapMeta").textContent = "No location yet — the driver hasn't started sharing today.";
+          }
+        } catch (err) {
+          document.getElementById("mapMeta").textContent = "Couldn't load location.";
+        }
+      }
+      poll();
+      pollTimer = setInterval(poll, 6000);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

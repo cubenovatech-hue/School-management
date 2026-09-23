@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Driver — Share Location</title>
+<link rel="stylesheet" href="/css/style.css" />
+<style>
+  body { background: var(--ink); }
+  .driver-shell { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .driver-card {
+    background: var(--paper-raised); border-radius: 12px; padding: 32px 26px;
+    width: 100%; max-width: 380px; text-align: center;
+  }
+  .status-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+  .status-dot.off { background: #C4C4C4; }
+  .status-dot.on { background: #2F6D5E; animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+  .big-btn { width: 100%; padding: 18px; font-size: 16px; border-radius: 10px; margin-top: 20px; }
+  .last-update { margin-top: 16px; font-size: 12.5px; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+<div class="driver-shell">
+  <div class="driver-card">
+    <div class="brand-mark" style="margin: 0 auto 16px;">🚌</div>
+    <h2 id="busTitle" style="margin-bottom:4px;">Loading…</h2>
+    <p class="muted small-text" id="routeText" style="margin-bottom:20px;"></p>
+
+    <div><span class="status-dot off" id="statusDot"></span><span id="statusText">Not sharing</span></div>
+
+    <button class="btn big-btn" id="toggleBtn" onclick="toggleSharing()">Start sharing location</button>
+    <div class="last-update" id="lastUpdate"></div>
+    <div id="errorBox" class="error-banner" style="margin-top:16px;"></div>
+  </div>
+</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const busId = params.get("busId");
+  const token = params.get("token");
+
+  let watchId = null;
+  let sending = false;
+
+  function showError(msg) {
+    const box = document.getElementById("errorBox");
+    box.textContent = msg;
+    box.classList.add("show");
+  }
+
+  async function loadBusInfo() {
+    if (!busId || !token) {
+      showError("This link is missing information. Please ask the school office for the correct driver link.");
+      return;
+    }
+    try {
+      const res = await fetch(`/api/bus/${busId}/info?token=${token}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      document.getElementById("busTitle").textContent = data.busNumber;
+      document.getElementById("routeText").textContent = data.routeName;
+    } catch (err) {
+      showError(err.message || "Couldn't load this bus. The link may be invalid.");
+    }
+  }
+
+  function toggleSharing() {
+    if (sending) {
+      stopSharing();
+    } else {
+      startSharing();
+    }
+  }
+
+  function startSharing() {
+    if (!navigator.geolocation) {
+      showError("Your browser doesn't support location sharing.");
+      return;
+    }
+    sending = true;
+    document.getElementById("statusDot").className = "status-dot on";
+    document.getElementById("statusText").textContent = "Sharing live";
+    document.getElementById("toggleBtn").textContent = "Stop sharing";
+    document.getElementById("toggleBtn").className = "btn big-btn danger";
+
+    watchId = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const { latitude, longitude, speed } = pos.coords;
+        try {
+          await fetch(`/api/bus/${busId}/location`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              token,
+              lat: latitude,
+              lng: longitude,
+              speedKmh: speed ? Math.round(speed * 3.6) : null,
+            }),
+          });
+          document.getElementById("lastUpdate").textContent = "Last sent: " + new Date().toLocaleTimeString();
+        } catch {
+          showError("Couldn't send your location — check your internet connection.");
+        }
+      },
+      (err) => {
+        showError("Location error: " + err.message + ". Make sure location permission is allowed for this page.");
+        stopSharing();
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    );
+  }
+
+  async function stopSharing() {
+    sending = false;
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    document.getElementById("statusDot").className = "status-dot off";
+    document.getElementById("statusText").textContent = "Not sharing";
+    document.getElementById("toggleBtn").textContent = "Start sharing location";
+    document.getElementById("toggleBtn").className = "btn big-btn";
+
+    try {
+      await fetch(`/api/bus/${busId}/stop-sharing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+    } catch {}
+  }
+
+  loadBusInfo();
+</script>
+</body>
+</html>

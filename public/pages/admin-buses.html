@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Buses — Admin</title>
+<link rel="stylesheet" href="/css/style.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  #map { height: 420px; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="eyebrow">Admin portal</div>
+        <h1>Buses &amp; live tracking</h1>
+      </div>
+      <button class="btn" onclick="openCreateModal()">+ Add bus</button>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead><tr><th>Bus</th><th>Route</th><th>Driver</th><th>Assigned classes</th><th>Status</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div id="empty" class="empty-state" style="display:none;">No buses added yet.</div>
+    </div>
+
+    <div class="panel" id="mapPanel" style="display:none;">
+      <div class="panel-head">
+        <h2 id="mapTitle">Live map</h2>
+        <button class="btn ghost small" onclick="closeMap()">Close</button>
+      </div>
+      <div id="map"></div>
+      <div class="small-text muted" style="margin-top:10px;" id="mapMeta"></div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="createBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeCreateModal()">×</button>
+    <h2 style="margin-bottom:18px;">Add bus</h2>
+    <form id="createForm">
+      <div class="field"><label>Bus number</label><input id="c_number" required placeholder="Bus 4" /></div>
+      <div class="field"><label>Route name</label><input id="c_route" required placeholder="Route A — North Zone" /></div>
+      <div class="field"><label>Driver name</label><input id="c_driver" required /></div>
+      <div class="field"><label>Driver phone</label><input id="c_phone" /></div>
+      <div class="field"><label>Assigned classes</label><select id="c_classes" multiple size="4"></select></div>
+      <button class="btn full" type="submit">Save bus</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="linkBackdrop">
+  <div class="modal">
+    <button class="modal-close" onclick="closeLinkModal()">×</button>
+    <h2 style="margin-bottom:6px;">Driver link</h2>
+    <p class="small-text muted" style="margin-bottom:16px;">Send this link to the driver (WhatsApp, SMS) — they open it once on their phone and tap "Start sharing." No login needed.</p>
+    <div class="panel" style="word-break:break-all; font-size:12.5px;" id="linkText"></div>
+    <button class="btn full" style="margin-top:16px;" onclick="copyLink()">Copy link</button>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  requireAuth(["admin"]);
+  renderSidebar("buses");
+
+  let currentLink = "";
+  let map, marker;
+  let pollTimer = null;
+
+  async function init() {
+    const classes = await api("/classes");
+    document.getElementById("c_classes").innerHTML = classes.map((c) => `<option value="${c._id}">${c.name}-${c.section}</option>`).join("");
+    await loadBuses();
+  }
+
+  async function loadBuses() {
+    const buses = await api("/bus");
+    document.getElementById("empty").style.display = buses.length ? "none" : "block";
+    document.getElementById("rows").innerHTML = buses
+      .map(
+        (b) => `<tr>
+          <td>${b.busNumber}</td>
+          <td>${b.routeName}</td>
+          <td>${b.driverName}${b.driverPhone ? " · " + b.driverPhone : ""}</td>
+          <td>${(b.assignedClasses || []).map((c) => c.name + "-" + c.section).join(", ") || "-"}</td>
+          <td><span class="pill ${b.sharingActive ? "present" : "absent"}">${b.sharingActive ? "Live" : "Offline"}</span></td>
+          <td style="white-space:nowrap;">
+            <button class="btn small secondary" onclick="showDriverLink('${b._id}')">Driver link</button>
+            <button class="btn small" onclick="trackBus('${b._id}', '${b.busNumber}')">Track</button>
+            <button class="btn small ghost" onclick="removeBus('${b._id}')">Remove</button>
+          </td>
+        </tr>`
+      )
+      .join("");
+  }
+
+  function openCreateModal() { document.getElementById("createBackdrop").classList.add("show"); }
+  function closeCreateModal() { document.getElementById("createBackdrop").classList.remove("show"); }
+
+  document.getElementById("createForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const selectedClasses = [...document.getElementById("c_classes").selectedOptions].map((o) => o.value);
+    try {
+      const res = await api("/bus", {
+        method: "POST",
+        body: JSON.stringify({
+          busNumber: document.getElementById("c_number").value,
+          routeName: document.getElementById("c_route").value,
+          driverName: document.getElementById("c_driver").value,
+          driverPhone: document.getElementById("c_phone").value,
+          assignedClasses: selectedClasses,
+        }),
+      });
+      toast("Bus added");
+      closeCreateModal();
+      e.target.reset();
+      loadBuses();
+      currentLink = res.driverLink;
+      document.getElementById("linkText").textContent = currentLink;
+      document.getElementById("linkBackdrop").classList.add("show");
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  async function showDriverLink(id) {
+    try {
+      const res = await api(`/bus/${id}/driver-link`);
+      currentLink = res.driverLink;
+      document.getElementById("linkText").textContent = currentLink;
+      document.getElementById("linkBackdrop").classList.add("show");
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+  function closeLinkModal() { document.getElementById("linkBackdrop").classList.remove("show"); }
+  function copyLink() {
+    navigator.clipboard.writeText(currentLink);
+    toast("Link copied");
+  }
+
+  async function removeBus(id) {
+    if (!confirm("Remove this bus?")) return;
+    try {
+      await api(`/bus/${id}`, { method: "DELETE" });
+      toast("Bus removed");
+      loadBuses();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  async function trackBus(id, label) {
+    document.getElementById("mapPanel").style.display = "block";
+    document.getElementById("mapTitle").textContent = `Live map — ${label}`;
+    document.getElementById("mapPanel").scrollIntoView({ behavior: "smooth" });
+
+    if (!map) {
+      map = L.map("map").setView([20.5937, 78.9629], 5); // default: India, zooms in once we get a real point
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+      marker = L.marker([20.5937, 78.9629]).addTo(map);
+    }
+
+    async function poll() {
+      try {
+        const bus = await api(`/bus/${id}/location`);
+        if (bus.currentLocation && bus.currentLocation.lat) {
+          const { lat, lng, speedKmh, updatedAt } = bus.currentLocation;
+          marker.setLatLng([lat, lng]);
+          map.setView([lat, lng], 15);
+          document.getElementById("mapMeta").textContent =
+            `${bus.sharingActive ? "🟢 Live" : "⚪ Last known"} · ${speedKmh != null ? speedKmh + " km/h · " : ""}Updated ${new Date(updatedAt).toLocaleTimeString()}`;
+        } else {
+          document.getElementById("mapMeta").textContent = "No location received yet — waiting for the driver to start sharing.";
+        }
+      } catch (err) {
+        document.getElementById("mapMeta").textContent = "Couldn't load location: " + err.message;
+      }
+    }
+
+    if (pollTimer) clearInterval(pollTimer);
+    poll();
+    pollTimer = setInterval(poll, 6000);
+  }
+
+  function closeMap() {
+    document.getElementById("mapPanel").style.display = "none";
+    if (pollTimer) clearInterval(pollTimer);
+  }
+
+  init().catch((err) => toast(err.message, true));
+</script>
+</body>
+</html>
