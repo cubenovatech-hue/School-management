@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
 <style>
 /* ============================================================
    Design tokens — shared with the Northfield app
@@ -393,6 +396,24 @@ footer .links { display: flex; gap: 20px; font-size: 13.5px; }
   background: var(--admin); color: #fff; border: none; border-radius: 50%;
   width: 36px; height: 36px; flex-shrink: 0; cursor: pointer; font-size: 15px;
 }
+
+/* ---------------- Chatbot Markdown formatting ---------------- */
+.chat-msg.bot {
+  max-width: 95%;
+  overflow-x: auto;
+  overflow-wrap: anywhere;
+}
+.chat-msg.bot p { margin: 0 0 8px; }
+.chat-msg.bot p:last-child { margin-bottom: 0; }
+.chat-msg.bot ul, .chat-msg.bot ol { padding-left: 20px; margin: 7px 0; }
+.chat-msg.bot h1, .chat-msg.bot h2, .chat-msg.bot h3 { font-family: 'Space Grotesk', sans-serif; font-size: 14px; margin: 9px 0 5px; }
+.chat-msg.bot table { display: block; width: 100%; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 9px 0; font-size: 12px; }
+.chat-msg.bot th, .chat-msg.bot td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; }
+.chat-msg.bot th { background: var(--paper); font-weight: 700; }
+.chat-msg.bot blockquote { border-left: 3px solid var(--admin); margin: 8px 0; padding-left: 10px; color: var(--ink-soft); }
+.chat-msg.bot pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--paper); padding: 8px; border-radius: 6px; }
+.chat-msg.bot a { color: var(--admin); text-decoration: underline; }
+.chat-input-row button:disabled { opacity: .55; cursor: wait; }
 
 @media (max-width: 420px) {
   .chat-panel { right: 12px; bottom: 82px; width: calc(100vw - 24px); }
@@ -863,7 +884,20 @@ function toggleChat() {
 function appendChatMessage(role, text) {
   const msgEl = document.createElement('div');
   msgEl.className = `chat-msg ${role === 'user' ? 'user' : 'bot'}`;
-  msgEl.textContent = text;
+
+  // User messages are always plain text. Bot Markdown is sanitized before insertion.
+  if (role === 'user') {
+    msgEl.textContent = text;
+  } else if (window.marked && window.DOMPurify) {
+    const rendered = window.marked.parse(String(text || ''), {
+      gfm: true,
+      breaks: true
+    });
+    msgEl.innerHTML = window.DOMPurify.sanitize(rendered);
+  } else {
+    msgEl.textContent = text;
+  }
+
   const container = document.getElementById('chatMessages');
   container.appendChild(msgEl);
   container.scrollTop = container.scrollHeight;
@@ -872,12 +906,14 @@ function appendChatMessage(role, text) {
 
 async function sendChatMessage() {
   const input = document.getElementById('chatInput');
+  const sendButton = document.querySelector('.chat-input-row button');
   const message = input.value.trim();
-  if (!message) return;
+  if (!message || input.disabled) return;
 
   appendChatMessage('user', message);
   input.value = '';
   input.disabled = true;
+  if (sendButton) sendButton.disabled = true;
 
   const typingEl = appendChatMessage('bot', 'Typing…');
   typingEl.classList.add('typing');
@@ -886,18 +922,31 @@ async function sendChatMessage() {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, history: chatHistory }),
+      body: JSON.stringify({ message, history: chatHistory })
     });
-    const data = await res.json();
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.reply || data.message || `Chat request failed (${res.status})`);
+    }
+
+    const reply = typeof data.reply === 'string' && data.reply.trim()
+      ? data.reply.trim()
+      : "Sorry, I couldn't process that. Please try again.";
+
     typingEl.remove();
-    appendChatMessage('bot', data.reply || "Sorry, I couldn't process that.");
+    appendChatMessage('bot', reply);
+
     chatHistory.push({ role: 'user', content: message });
-    chatHistory.push({ role: 'assistant', content: data.reply || '' });
-  } catch {
+    chatHistory.push({ role: 'assistant', content: reply });
+    chatHistory = chatHistory.slice(-8);
+  } catch (err) {
     typingEl.remove();
-    appendChatMessage('bot', "Sorry, something went wrong — please try again.");
+    appendChatMessage('bot', err.message || 'Sorry, something went wrong. Please try again.');
+    console.error('[Northfield chat]', err);
   } finally {
     input.disabled = false;
+    if (sendButton) sendButton.disabled = false;
     input.focus();
   }
 }
